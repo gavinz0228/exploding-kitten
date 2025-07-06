@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exploding Kittens - Game</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- Game Header -->
+        <header class="game-header">
+            <div class="room-info">
+                <h1>🐱💥 Room: <span id="room-id"></span></h1>
+                <div class="game-status">
+                    <span id="game-state">Waiting for players...</span>
+                </div>
+            </div>
+            <div class="deck-info">
+                <div class="deck-count">
+                    <div class="deck-icon">🎴</div>
+                    <span id="deck-size">0</span>
+                </div>
+                <div class="discard-pile" id="discard-pile">
+                    <div class="card-back">Discard</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Players Area -->
+        <div class="players-area">
+            <div id="players-list" class="players-grid">
+                <!-- Players will be dynamically added here -->
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="game-area">
+            <!-- Current Turn Info -->
+            <div class="turn-info">
+                <div id="current-turn" class="current-turn">
+                    <span id="current-player">Waiting...</span>
+                    <div id="turns-remaining" class="turns-remaining hidden">
+                        Turns remaining: <span id="turns-count">1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="draw-card-btn" class="action-btn primary-btn" disabled>
+                    Draw Card
+                </button>
+                <button id="start-game-btn" class="action-btn secondary-btn hidden">
+                    Start Game
+                </button>
+            </div>
+
+            <!-- Player Hand -->
+            <div class="player-hand-area">
+                <h3>Your Hand</h3>
+                <div id="player-hand" class="player-hand">
+                    <!-- Player's cards will be displayed here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Log -->
+        <div class="game-log">
+            <h4>Game Log</h4>
+            <div id="log-messages" class="log-messages">
+                <!-- Game messages will appear here -->
+            </div>
+        </div>
+
+        <!-- Modals -->
+        
+        <!-- Target Player Selection Modal -->
+        <div id="target-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Select Target Player</h3>
+                <div id="target-players" class="target-players">
+                    <!-- Target players will be listed here -->
+                </div>
+                <button id="cancel-target" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+
+        <!-- See Future Modal -->
+        <div id="future-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Future Cards (Top 3)</h3>
+                <div id="future-cards" class="future-cards">
+                    <!-- Future cards will be displayed here -->
+                </div>
+                <button id="close-future" class="primary-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- Favor Response Modal -->
+        <div id="favor-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="favor-message">Choose a card to give</h3>
+                <div id="favor-cards" class="favor-cards">
+                    <!-- Player's cards for favor selection -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Exploding Kitten Placement Modal -->
+        <div id="placement-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Place Exploding Kitten Back in Deck</h3>
+                <p>Choose where to place the Exploding Kitten:</p>
+                <div class="placement-options">
+                    <button class="placement-btn" data-position="0">Top of Deck</button>
+                    <button class="placement-btn" data-position="1">2nd from Top</button>
+                    <button class="placement-btn" data-position="2">3rd from Top</button>
+                    <button class="placement-btn" data-position="-1">Random Position</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="game-over-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="game-over-title">Game Over!</h2>
+                <p id="game-over-message"></p>
+                <div class="game-over-actions">
+                    <button id="reset-game-btn" class="primary-btn">Reset Game</button>
+                    <button id="new-game-btn" class="secondary-btn">New Game</button>
+                    <button id="back-to-lobby-btn" class="secondary-btn">Back to Lobby</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="status-message" class="status-message hidden">
+            <span id="status-text"></span>
+            <button id="close-status" class="close-btn">&times;</button>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <p id="loading-text">Loading game...</p>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/cards.js"></script>
+    <script src="/js/game.js"></script>
+</body>
+</html>

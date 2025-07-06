@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exploding Kittens - Multiplayer</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐱💥 Exploding Kittens</h1>
+            <p>Multiplayer Card Game</p>
+        </header>
+
+        <main>
+            <!-- Player Name Setup -->
+            <div id="name-setup" class="section">
+                <h2>Enter Your Name</h2>
+                <div class="input-group">
+                    <input type="text" id="player-name" placeholder="Your name" maxlength="20">
+                    <button id="set-name-btn">Join Lobby</button>
+                </div>
+            </div>
+
+            <!-- Lobby -->
+            <div id="lobby" class="section hidden">
+                <div class="player-info">
+                    <h2>Welcome, <span id="display-name"></span>!</h2>
+                </div>
+
+                <div class="lobby-actions">
+                    <div class="action-card">
+                        <h3>Create New Game</h3>
+                        <p>Start a new game room and invite friends</p>
+                        <button id="create-room-btn" class="primary-btn">Create Room</button>
+                    </div>
+
+                    <div class="action-card">
+                        <h3>Join Existing Game</h3>
+                        <p>Enter a room code to join a friend's game</p>
+                        <div class="input-group">
+                            <input type="text" id="room-code" placeholder="Room Code (e.g. ABC123)" maxlength="6">
+                            <button id="join-room-btn">Join Room</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="available-rooms">
+                    <h3>Available Rooms</h3>
+                    <div id="rooms-list">
+                        <p class="no-rooms">No rooms available. Create one to get started!</p>
+                    </div>
+                    <button id="refresh-rooms-btn" class="secondary-btn">Refresh</button>
+                </div>
+
+                <div class="game-rules">
+                    <h3>How to Play</h3>
+                    <div class="rules-content">
+                        <p><strong>Objective:</strong> Be the last player standing by avoiding Exploding Kittens!</p>
+                        <ul>
+                            <li>Each player starts with 4 cards + 1 Defuse card</li>
+                            <li>On your turn, play action cards (optional) then draw a card</li>
+                            <li>If you draw an Exploding Kitten, use a Defuse card or you're out!</li>
+                            <li>Use action cards strategically to survive and eliminate opponents</li>
+                        </ul>
+                        <p><strong>Card Types:</strong></p>
+                        <ul>
+                            <li><strong>Skip:</strong> End turn without drawing</li>
+                            <li><strong>Attack:</strong> Next player takes 2 turns</li>
+                            <li><strong>See Future:</strong> Look at top 3 cards</li>
+                            <li><strong>Shuffle:</strong> Shuffle the deck</li>
+                            <li><strong>Favor:</strong> Force another player to give you a card</li>
+                            <li><strong>Cat Cards:</strong> Play pairs to steal cards from opponents</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Status Messages -->
+        <div id="status-message" class="status-message hidden">
+            <span id="status-text"></span>
+            <button id="close-status" class="close-btn">&times;</button>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <p>Connecting...</p>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/lobby.js"></script>
+</body>
+</html>
