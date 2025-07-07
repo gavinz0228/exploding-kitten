@@ -3,6 +3,7 @@ const CardDeck = require('./cardDeck');
 class Game {
   constructor(roomId) {
     this.roomId = roomId;
+    this.broadcastCallback = null;
     this.players = [];
     this.deck = new CardDeck();
     this.currentPlayerIndex = 0;
@@ -14,6 +15,10 @@ class Game {
     this.winner = null;
     this.maxPlayers = 5;
     this.minPlayers = 2;
+  }
+
+  setBroadcastCallback(cb) {
+    this.broadcastCallback = cb;
   }
 
   addPlayer(playerId, playerName) {
@@ -109,26 +114,51 @@ class Game {
   }
 
   playCard(playerId, cardId, targetPlayerId = null, additionalData = null) {
+    console.log(`[playCard] playerId=${playerId}, cardId=${cardId}, targetPlayerId=${targetPlayerId}, additionalData=${JSON.stringify(additionalData)}`);
     if (this.gameState !== 'playing') {
+      console.log(`[playCard] Game not in progress`);
       return { success: false, message: 'Game not in progress' };
     }
 
     const player = this.getPlayer(playerId);
     if (!player || !player.isAlive) {
+      console.log(`[playCard] Player not found or eliminated: ${playerId}`);
       return { success: false, message: 'Player not found or eliminated' };
-    }
-
-    if (this.getCurrentPlayer().id !== playerId) {
-      return { success: false, message: 'Not your turn' };
     }
 
     const cardIndex = player.hand.findIndex(card => card.id === cardId);
     if (cardIndex === -1) {
+      console.log(`[playCard] Card not found in hand: ${cardId}`);
       return { success: false, message: 'Card not found in hand' };
     }
-
     const card = player.hand[cardIndex];
-    
+
+    console.log(`[playCard] cardType=${card.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
+
+    // Special case: allow any eligible player to play Nope during a nope window, regardless of turn or pending action
+    if (card.type === 'nope') {
+      if (!this.nopeWindow) {
+        console.log(`[playCard] Nope can only be played in response to other cards: playerId=${playerId}, cardId=${cardId}, cardType=${card.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
+        return { success: false, message: '4 Nope can only be played in response to other cards' };
+      }
+      if (this.nopeWindow.excludePlayerId === playerId) {
+        console.log(`[playCard] Player tried to nope their own action`);
+        return { success: false, message: 'You cannot nope your own action' };
+      }
+      console.log(`[playCard] Allowing Nope during nope window`);
+      // Allow to play Nope during the nope window, regardless of turn or pending action
+    } else {
+      // For all other cards, enforce current player and no pending action
+      if (this.getCurrentPlayer().id !== playerId) {
+        console.log(`[playCard] Not your turn: playerId=${playerId}, currentPlayerId=${this.getCurrentPlayer().id}`);
+        return { success: false, message: 'Not your turn' };
+      }
+      if (this.pendingAction) {
+        console.log(`[playCard] Waiting for response to previous action`);
+        return { success: false, message: 'Waiting for response to previous action' };
+      }
+    }
+
     // Handle different card types
     const result = this.executeCardAction(player, card, targetPlayerId, additionalData);
     
@@ -147,16 +177,54 @@ class Game {
   }
 
   playMultipleCards(playerId, cardIds, primaryCardId, targetPlayerId = null, additionalData = null) {
+    console.log(`[playMultipleCards] playerId=${playerId}, cardIds=${JSON.stringify(cardIds)}, primaryCardId=${primaryCardId}, targetPlayerId=${targetPlayerId}, additionalData=${JSON.stringify(additionalData)}`);
     if (this.gameState !== 'playing') {
+      console.log(`[playMultipleCards] Game not in progress`);
       return { success: false, message: 'Game not in progress' };
     }
 
     const player = this.getPlayer(playerId);
     if (!player || !player.isAlive) {
+      console.log(`[playMultipleCards] Player not found or eliminated: ${playerId}`);
       return { success: false, message: 'Player not found or eliminated' };
     }
 
+    // If only one card and it's a Nope, delegate to playCard for correct logic
+    if (cardIds.length === 1) {
+      const singleCard = player.hand.find(c => c.id === cardIds[0]);
+      if (singleCard && singleCard.type === 'nope') {
+        console.log(`[playMultipleCards] Single Nope card detected, delegating to playCard`);
+        return this.playCard(playerId, cardIds[0], targetPlayerId, additionalData);
+      }
+    }
+
+    // Special case: allow any eligible player to play Nope during a nope window, regardless of turn or pending action
+    // (Assume that if the first card in cardIds is a Nope, this is a Nope play)
+    const firstCard = player.hand.find(c => c.id === cardIds[0]);
+    if (firstCard && firstCard.type === 'nope') {
+      if (!this.nopeWindow) {
+        console.log(`[playMultipleCards] Nope can only be played in response to other cards: playerId=${playerId}, cardId=${cardIds[0]}, cardType=${firstCard.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
+        return { success: false, message: '3 Nope can only be played in response to other cards' };
+      }
+      if (this.nopeWindow.excludePlayerId === playerId) {
+        console.log(`[playMultipleCards] Player tried to nope their own action`);
+        return { success: false, message: 'You cannot nope your own action' };
+      }
+      // Allow to play Nope during the nope window, regardless of turn or pending action
+      // Remove the Nope card from hand and discard it
+      const nopeIndex = player.hand.findIndex(card => card.id === cardIds[0]);
+      if (nopeIndex === -1) {
+        console.log(`[playMultipleCards] Nope card not found in hand`);
+        return { success: false, message: 'Nope card not found in hand' };
+      }
+      const nopeCard = player.hand.splice(nopeIndex, 1)[0];
+      this.deck.discard(nopeCard);
+      console.log(`[playMultipleCards] Allowing Nope during nope window`);
+      return this.playNopeCard(player);
+    }
+
     if (this.getCurrentPlayer().id !== playerId) {
+      console.log(`[playMultipleCards] Not your turn: playerId=${playerId}, currentPlayerId=${this.getCurrentPlayer().id}`);
       return { success: false, message: 'Not your turn' };
     }
 
@@ -234,7 +302,19 @@ class Game {
       return this.executeNamedSteal(player, targetPlayer, additionalData.cardName);
     } else {
       // Random steal with 2 or 3 cards (if 3 cards but not named steal, treat as random)
-      return this.executeRandomSteal(player, targetPlayer);
+      // Open a nope window for random steal
+      let stealResolved = false;
+      let result = { success: true, message: 'Random steal in progress', data: { nopeable: true, action: 'random_steal' } };
+      this.createNopeWindow('Random Steal', player.id, () => {
+        if (!stealResolved) {
+          stealResolved = true;
+          const stealResult = this.executeRandomSteal(player, targetPlayer);
+          if (typeof this.broadcastCallback === 'function') {
+            this.broadcastCallback({ type: 'random_steal-resolved', message: stealResult.message });
+          }
+        }
+      });
+      return result;
     }
   }
 
@@ -254,54 +334,80 @@ class Game {
   }
 
   executeNamedSteal(player, targetPlayer, cardName) {
-    // Look for the named card in target player's hand
-    const targetCardIndex = targetPlayer.hand.findIndex(c => c.type === cardName);
-    
-    if (targetCardIndex === -1) {
-      this.addToLog(`${player.name} tried to steal ${cardName} from ${targetPlayer.name} but they don't have it`);
-      return { 
-        success: true, 
-        message: `${targetPlayer.name} doesn't have a ${cardName}`,
-        data: { namedStealFailed: true }
-      };
-    }
-
-    // Steal the named card
-    const stolenCard = targetPlayer.hand.splice(targetCardIndex, 1)[0];
-    player.hand.push(stolenCard);
-
-    this.addToLog(`${player.name} stole ${stolenCard.type} from ${targetPlayer.name}`);
-    
-    return { 
-      success: true, 
-      message: `Stole ${stolenCard.type} from ${targetPlayer.name}`,
-      data: { stolenCard, namedSteal: true }
-    };
+    // Open a nope window for named steal
+    let stealResolved = false;
+    let result = { success: true, message: 'Named steal in progress', data: { nopeable: true, action: 'named_steal', cardName } };
+    this.createNopeWindow('Named Steal', player.id, () => {
+      if (!stealResolved) {
+        stealResolved = true;
+        // Look for the named card in target player's hand
+        const targetCardIndex = targetPlayer.hand.findIndex(c => c.type === cardName);
+        if (targetCardIndex === -1) {
+          this.addToLog(`${player.name} tried to steal ${cardName} from ${targetPlayer.name} but they don't have it`);
+          if (typeof this.broadcastCallback === 'function') {
+            this.broadcastCallback({ type: 'named_steal-resolved', message: `${targetPlayer.name} doesn't have a ${cardName}` });
+          }
+          return;
+        }
+        // Steal the named card
+        const stolenCard = targetPlayer.hand.splice(targetCardIndex, 1)[0];
+        player.hand.push(stolenCard);
+        this.addToLog(`${player.name} stole ${stolenCard.type} from ${targetPlayer.name}`);
+        if (typeof this.broadcastCallback === 'function') {
+          this.broadcastCallback({ type: 'named_steal-resolved', message: `Stole ${stolenCard.type} from ${targetPlayer.name}` });
+        }
+      }
+    });
+    return result;
   }
 
   executeCardAction(player, card, targetPlayerId, additionalData) {
     switch (card.type) {
       case 'skip':
-        this.endTurn();
-        return { success: true, message: 'Turn skipped' };
+        // Create nope window for skip action
+        this.createNopeWindow('Skip', player.id, () => {
+          this.endTurn();
+        });
+        return { 
+          success: true, 
+          message: 'Turn skipped',
+          data: { nopeable: true, action: 'skip' }
+        };
 
       case 'attack':
-        // End current turn and set next player to have 2 turns
-        this.endTurn();
-        this.turnsRemaining = 2;
-        return { success: true, message: 'Next player takes 2 turns' };
+        // Create nope window for attack action
+        this.createNopeWindow('Attack', player.id, () => {
+          this.endTurn();
+          this.turnsRemaining = 2;
+        });
+        return { 
+          success: true, 
+          message: 'Next player takes 2 turns',
+          data: { nopeable: true, action: 'attack' }
+        };
 
       case 'see_future':
+        // Create nope window for see future action
         const topCards = this.deck.peekTop(3);
+        this.createNopeWindow('See Future', player.id, () => {
+          // Action already executed (peeking doesn't change game state)
+        });
         return { 
           success: true, 
           message: 'Saw the future',
-          data: { topCards }
+          data: { topCards, nopeable: true, action: 'see_future' }
         };
 
       case 'shuffle':
-        this.deck.shuffle();
-        return { success: true, message: 'Deck shuffled' };
+        // Create nope window for shuffle action
+        this.createNopeWindow('Shuffle', player.id, () => {
+          this.deck.shuffle();
+        });
+        return { 
+          success: true, 
+          message: 'Deck shuffled',
+          data: { nopeable: true, action: 'shuffle' }
+        };
 
       case 'favor':
         if (!targetPlayerId) {
@@ -315,23 +421,26 @@ class Game {
           return { success: false, message: 'Target player has no cards' };
         }
         
-        // Set pending action for target to choose a card
-        this.pendingAction = {
-          type: 'favor',
-          fromPlayer: player.id,
-          toPlayer: targetPlayerId,
-          message: `${player.name} is asking for a card`
-        };
+        // Create nope window for favor action
+        this.createNopeWindow('Favor', player.id, () => {
+          this.pendingAction = {
+            type: 'favor',
+            fromPlayer: player.id,
+            toPlayer: targetPlayerId,
+            message: `${player.name} is asking for a card`
+          };
+        });
         
         return { 
           success: true, 
           message: `Asking ${targetPlayer.name} for a card`,
-          requiresResponse: true
+          data: { nopeable: true, action: 'favor', targetPlayer: targetPlayer.name }
         };
 
       case 'nope':
         if (!this.nopeWindow) {
-          return { success: false, message: 'Nope can only be played in response to other cards' };
+          console.log("Nope played when no nope window is open");
+          return { success: false, message: '2 Nope can only be played in response to other cards' };
         }
         return this.playNopeCard(player);
 
@@ -767,29 +876,86 @@ class Game {
     const nopeCard = player.hand.splice(nopeIndex, 1)[0];
     this.deck.discard(nopeCard);
 
-    // Cancel the action
-    const cancelledAction = this.nopeWindow.action;
-    this.nopeWindow = null;
+    // Increment nope count for nope chains
+    this.nopeWindow.nopeCount++;
+    
+    // Reset the timeout to allow for more nopes (nope chains)
+    if (this.nopeWindow.timeout) {
+      clearTimeout(this.nopeWindow.timeout);
+    }
+    
+    this.nopeWindow.timeout = setTimeout(() => {
+      // Execute or cancel based on final nope count
+      if (this.nopeWindow && this.nopeWindow.executeAction) {
+        // Even number of nopes = action executes, odd number = action cancelled
+        if (this.nopeWindow.nopeCount % 2 === 0) {
+          this.nopeWindow.executeAction();
+          this.addToLog(`${this.nopeWindow.action} resolved (${this.nopeWindow.nopeCount} nopes played)`);
+        } else {
+          this.addToLog(`${this.nopeWindow.action} was noped and cancelled (${this.nopeWindow.nopeCount} nopes played)`);
+        }
+      }
+      this.nopeWindow = null;
+    }, 5000); // Shorter timeout for nope chains
 
-    this.addToLog(`${player.name} played Nope! ${cancelledAction} was cancelled.`);
+    const isYup = this.nopeWindow.nopeCount % 2 === 0;
+    const message = isYup ? 
+      `${player.name} played Nope on the Nope! (Yup)` : 
+      `${player.name} played Nope! ${this.nopeWindow.action} is currently cancelled.`;
+    
+    this.addToLog(message);
 
     return {
       success: true,
-      message: `Noped! ${cancelledAction} was cancelled.`,
-      data: { noped: true, cancelledAction }
+      message: isYup ? 'Yup! Action will proceed unless noped again.' : 'Noped! Action cancelled unless noped again.',
+      data: { 
+        noped: true, 
+        nopeCount: this.nopeWindow.nopeCount,
+        isYup: isYup,
+        action: this.nopeWindow.action
+      }
     };
   }
 
-  createNopeWindow(action, excludePlayerId = null) {
+  createNopeWindow(action, excludePlayerId = null, executeAction = null) {
+    // Clear any existing nope window
+    if (this.nopeWindow && this.nopeWindow.timeout) {
+      clearTimeout(this.nopeWindow.timeout);
+    }
+
+    console.log(`[createNopeWindow] Opening nope window for action=${action}, excludePlayerId=${excludePlayerId}`);
+
     // Create a window for players to play nope cards
     this.nopeWindow = {
       action: action,
       excludePlayerId: excludePlayerId,
+      executeAction: executeAction,
+      nopeCount: 0, // Track number of nopes played (for nope chains)
       timeout: setTimeout(() => {
-        // If no one nopes within 5 seconds, the action proceeds
+        console.log(`[createNopeWindow] Nope window closing for action=${action}`);
+        // If no one nopes within 10 seconds, execute the action
+        if (this.nopeWindow && this.nopeWindow.executeAction) {
+          // Check if action should execute (even number of nopes = action executes)
+          if (this.nopeWindow.nopeCount % 2 === 0) {
+            this.nopeWindow.executeAction();
+            this.addToLog(`${action} resolved`);
+          } else {
+            this.addToLog(`${action} was noped and cancelled`);
+          }
+          // Broadcast new state after action is resolved or noped
+          if (typeof this.broadcastCallback === 'function') {
+            this.broadcastCallback({ type: action.toLowerCase() + '-resolved', gameState: this.getGameState() });
+          }
+        }
         this.nopeWindow = null;
-      }, 5000)
+      }, 10000) // 10 seconds for easier testing
     };
+
+    // Broadcast the updated game state to all players immediately after setting the nope window
+    if (typeof this.broadcastCallback === 'function') {
+      console.log(`[createNopeWindow] Broadcasting game state with nope window open for action=${action}`);
+      this.broadcastCallback({ type: 'nope-window-opened', message: `${action} can be noped now`, gameState: this.getGameState() });
+    }
 
     return this.nopeWindow;
   }
@@ -833,7 +999,8 @@ class Game {
       topDiscardCard: this.deck.getTopDiscardCard(),
       pendingAction: this.pendingAction,
       gameLog: this.gameLog.slice(-10), // Last 10 log entries
-      winner: this.winner?.name
+      winner: this.winner?.name,
+      nopeWindow: this.nopeWindow ? { action: this.nopeWindow.action, excludePlayerId: this.nopeWindow.excludePlayerId } : null // Include nope window information
     };
   }
 
@@ -844,7 +1011,7 @@ class Game {
     if (player) {
       gameState.playerHand = player.hand;
       gameState.isMyTurn = this.getCurrentPlayer()?.id === playerId;
-    }
+    };
     
     return gameState;
   }

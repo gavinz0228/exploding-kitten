@@ -123,11 +123,16 @@ class CardRenderer {
         // Special rules for specific cards
         switch (cardType) {
             case 'nope':
-                // Nope can be played by any player when there's a nope window
+                // Nope can be played by any player (except the action initiator) when there's a nope window
                 if (gameState.nopeWindow) {
+                    // Exclude the action initiator from playing Nope
+                    if (gameState.nopeWindow.excludePlayerId && gameState.nopeWindow.excludePlayerId === playerId) {
+                        return { canPlay: false, reason: "You cannot nope your own action" };
+                    }
                     return { canPlay: true, reason: "Can nope the current action" };
                 }
-                return { canPlay: false, reason: "Nope can only be played in response to other cards" };
+                console.log("Nope played when no nope window is open " + gameState.nopeWindow);
+                return { canPlay: false, reason: "1 Nope can only be played in response to other cards" };
             
             case 'defuse':
                 return { canPlay: false, reason: "Defuse can only be used when drawing an Exploding Kitten" };

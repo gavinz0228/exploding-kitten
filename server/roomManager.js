@@ -2,16 +2,42 @@ const Game = require('./gameLogic');
 const { v4: uuidv4 } = require('uuid');
 
 class RoomManager {
-  constructor() {
+  constructor(io) {
+    this.io = io;
     this.rooms = new Map();
     this.playerRooms = new Map(); // Track which room each player is in (by persistent player ID)
     this.socketToPlayer = new Map(); // Map socket IDs to persistent player IDs
     this.playerToSocket = new Map(); // Map persistent player IDs to current socket IDs
   }
 
+  broadcastGameState(roomId, customAction = null) {
+    const game = this.rooms.get(roomId);
+    if (!game) return;
+
+    game.players.forEach(player => {
+      const socketId = this.playerToSocket.get(player.id);
+      if (socketId) {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          const action = customAction ? { ...customAction, player: player.name } : null;
+          console.log(`[broadcastGameState] Broadcasting game state to playerId=${player.id}, nopeWindow=${!!game.nopeWindow}`);
+          socket.emit('game-updated', {
+            gameState: game.getPlayerGameState(player.id),
+            action: action
+          });
+        }
+      }
+    });
+  }
+
   createRoom(hostPlayerId, hostPlayerName, socketId) {
     const roomId = this.generateRoomId();
     const game = new Game(roomId);
+
+    // Inject broadcast callback for async actions (nope windows)
+    game.setBroadcastCallback((customAction = null) => {
+      this.broadcastGameState(roomId, customAction);
+    });
     
     // Add host as first player
     const result = game.addPlayer(hostPlayerId, hostPlayerName);
@@ -74,6 +100,8 @@ class RoomManager {
     this.socketToPlayer.set(socketId, playerId);
     this.playerToSocket.set(playerId, socketId);
 
+    this.broadcastGameState(roomId, { type: 'player-joined', message: `${playerName} joined the game` });
+
     return {
       success: true,
       roomId,
@@ -102,6 +130,8 @@ class RoomManager {
     if (game.players.length === 0) {
       this.rooms.delete(roomId);
       console.log(`Room ${roomId} removed - no players remaining`);
+    } else {
+      this.broadcastGameState(roomId, { type: 'player-left', message: `${game.getPlayer(playerId)?.name || 'A player'} left the game` });
     }
 
     return { success: true, roomRemoved: game.players.length === 0 };
@@ -144,7 +174,11 @@ class RoomManager {
       return { success: false, message: 'Player not in this room' };
     }
 
-    return game.startGame();
+    const result = game.startGame();
+    if (result.success) {
+      this.broadcastGameState(roomId, { type: 'game-started', message: 'Game started!' });
+    }
+    return result;
   }
 
   playCard(playerId, cardId, targetPlayerId = null, additionalData = null) {
@@ -160,7 +194,11 @@ class RoomManager {
       return { success: false, message: 'Room not found' };
     }
 
-    return game.playCard(actualPlayerId, cardId, targetPlayerId, additionalData);
+    const result = game.playCard(actualPlayerId, cardId, targetPlayerId, additionalData);
+    if (result.success) {
+      this.broadcastGameState(roomId, { type: 'card-played', message: result.message });
+    }
+    return result;
   }
 
   playMultipleCards(playerId, cardIds, primaryCardId, targetPlayerId = null, additionalData = null) {
@@ -176,7 +214,18 @@ class RoomManager {
       return { success: false, message: 'Room not found' };
     }
 
-    return game.playMultipleCards(actualPlayerId, cardIds, primaryCardId, targetPlayerId, additionalData);
+    const result = game.playMultipleCards(actualPlayerId, cardIds, primaryCardId, targetPlayerId, additionalData);
+
+    // If this is a random steal, the result will be "in progress" and the actual state update will be handled asynchronously
+    if (result && result.data && result.data.nopeable && result.data.action === 'random_steal') {
+      // Do not broadcast here; broadcast will happen when the nope window resolves
+      return result;
+    }
+
+    if (result.success) {
+      this.broadcastGameState(roomId, { type: 'multiple-cards-played', message: result.message });
+    }
+    return result;
   }
 
   drawCard(playerId) {
@@ -192,7 +241,11 @@ class RoomManager {
       return { success: false, message: 'Room not found' };
     }
 
-    return game.drawCard(actualPlayerId);
+    const result = game.drawCard(actualPlayerId);
+    if (result.success) {
+      this.broadcastGameState(roomId, { type: 'card-drawn', message: result.message });
+    }
+    return result;
   }
 
   respondToPendingAction(playerId, response) {
@@ -208,7 +261,11 @@ class RoomManager {
       return { success: false, message: 'Room not found' };
     }
 
-    return game.respondToPendingAction(actualPlayerId, response);
+    const result = game.respondToPendingAction(actualPlayerId, response);
+    if (result.success) {
+      this.broadcastGameState(roomId, { type: 'action-response', message: result.message });
+    }
+    return result;
   }
 
   generateRoomId() {

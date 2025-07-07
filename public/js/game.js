@@ -46,7 +46,7 @@ class GameManager {
             console.log('Connected to server');
             // Clear any existing timeouts
             this.clearTimeouts();
-            
+
             // Set timeout for lobby join
             this.connectionTimeout = setTimeout(() => {
                 this.showStatus('Connection timeout - redirecting to lobby', 'error');
@@ -54,12 +54,35 @@ class GameManager {
                     window.location.href = '/';
                 }, 2000);
             }, 10000);
-            
+
+            // Always reload player info from sessionStorage in case of reconnect
+            this.playerName = sessionStorage.getItem('playerName');
+            this.playerId = sessionStorage.getItem('playerId');
+            const pathSegments = window.location.pathname.split('/').filter(Boolean);
+            this.roomId = pathSegments.length > 1 ? pathSegments[1] : sessionStorage.getItem('roomId');
+
             // Join the lobby first with persistent player ID, then the room
             this.socket.emit('join-lobby', { 
                 playerName: this.playerName,
                 playerId: this.playerId
             });
+        });
+
+        // Robust reconnection: on 'reconnect', re-emit join-lobby and join-room
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('Socket reconnected (attempt ' + attemptNumber + ')');
+            // Always reload player info from sessionStorage in case of reconnect
+            this.playerName = sessionStorage.getItem('playerName');
+            this.playerId = sessionStorage.getItem('playerId');
+            const pathSegments = window.location.pathname.split('/').filter(Boolean);
+            this.roomId = pathSegments.length > 1 ? pathSegments[1] : sessionStorage.getItem('roomId');
+
+            // Re-join lobby and room
+            this.socket.emit('join-lobby', { 
+                playerName: this.playerName,
+                playerId: this.playerId
+            });
+            // join-room will be emitted after lobby-joined as usual
         });
 
         this.socket.on('disconnect', () => {
@@ -116,10 +139,7 @@ class GameManager {
             }
         });
 
-        this.socket.on('game-started', (data) => {
-            this.updateGameState(data.gameState);
-            this.showStatus('Game started!', 'success');
-        });
+        
 
         this.socket.on('game-updated', (data) => {
             this.updateGameState(data.gameState);
@@ -129,16 +149,9 @@ class GameManager {
             }
         });
 
-        this.socket.on('player-joined', (data) => {
-            this.showStatus(`${data.playerName} joined the game`, 'success');
-            if (data.gameState) {
-                this.updateGameState(data.gameState);
-            }
-        });
+        
 
-        this.socket.on('player-left', (data) => {
-            this.showStatus(`${data.playerName} left the game`, 'warning');
-        });
+        
 
         this.socket.on('see-future', (data) => {
             this.showFutureCards(data.topCards);
@@ -186,14 +199,7 @@ class GameManager {
             this.showStatus(`${data.playerName} reconnected`, 'success');
         });
 
-        // Handle game reset
-        this.socket.on('game-reset', (data) => {
-            if (data.success) {
-                this.showStatus(data.message, 'success');
-                this.updateGameState(data.gameState);
-                this.hideAllModals();
-            }
-        });
+        
     }
 
     setupEventListeners() {
@@ -258,6 +264,15 @@ class GameManager {
     updateGameState(gameState) {
         this.gameState = gameState;
         
+        console.log(`[updateGameState] gameState.nopeWindow=${!!gameState.nopeWindow}`);
+
+        // Ensure the nope window is correctly set
+        if (gameState.nopeWindow) {
+            console.log(`[updateGameState] Nope window is active for action: ${gameState.nopeWindow.action}`);
+        } else {
+            console.log(`[updateGameState] No nope window active`);
+        }
+
         // Update UI elements
         this.updateGameStatus();
         this.updatePlayers();
@@ -315,9 +330,27 @@ class GameManager {
         if (this.gameState.playerHand) {
             this.gameState.playerHand.forEach(card => {
                 const cardElement = CardRenderer.createCardElement(card);
-                
-                // Add click handler
+
+                // Add click handler for all cards, but handle Nope logic separately
                 cardElement.addEventListener('click', () => {
+                    // Special handling for Nope card: allow any eligible player to play Nope during a nope window
+                    if (
+                        card.type === 'nope'
+                    ) {
+                        const canPlayNope = CardRenderer.canPlayCard('nope', this.gameState, this.playerId);
+                        if (canPlayNope.canPlay) {
+                            console.log(`[updatePlayerHand] Emitting play-card for Nope: cardId=${card.id}`);
+                            this.socket.emit('play-card', {
+                                cardId: card.id
+                            });
+                            // Animate card play
+                            CardRenderer.animateCardPlay(cardElement);
+                        } else {
+                            this.showStatus(canPlayNope.reason, 'error');
+                        }
+                        return;
+                    }
+                    // Otherwise, normal selection logic
                     this.selectCard(cardElement, card);
                 });
 
@@ -1280,10 +1313,15 @@ class GameManager {
     }
 
     hideAllModals() {
+        // Only hide the game over modal if the game is not finished
         document.querySelectorAll('.modal').forEach(modal => {
+            if (modal.id === 'game-over-modal' && this.gameState && this.gameState.gameState === 'finished') {
+                // Do not hide the game over modal if the game is finished
+                return;
+            }
             modal.classList.add('hidden');
         });
-        
+
         this.clearCardSelections();
     }
 

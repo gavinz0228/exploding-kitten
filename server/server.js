@@ -14,7 +14,7 @@ const io = socketIo(server, {
   }
 });
 
-const roomManager = new RoomManager();
+const roomManager = new RoomManager(io);
 
 // API Routes (must come before static files)
 app.get('/api/rooms', (req, res) => {
@@ -89,12 +89,6 @@ io.on('connection', (socket) => {
         roomId: result.roomId,
         gameState: result.game
       });
-
-      // Broadcast to room
-      socket.to(result.roomId).emit('player-joined', {
-        playerName: socket.playerName,
-        gameState: result.game
-      });
     } else {
       console.log(`Failed to create room: ${result.message}`);
       socket.emit('error', { message: result.message });
@@ -121,16 +115,11 @@ io.on('connection', (socket) => {
       if (oldRoomId && oldRoomId !== result.roomId && !result.reconnected) {
         const oldRoom = roomManager.getRoom(oldRoomId);
         if (oldRoom) {
-          // Notify remaining players in the old room that this player left
-          oldRoom.players.forEach(player => {
-            const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
-            const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
-            if (playerSocket) {
-              playerSocket.emit('player-left', {
-                playerName: socket.playerName,
-                gameState: oldRoom.getPlayerGameState(player.id)
-              });
-            }
+          // Broadcast updated game state to the old room
+          roomManager.broadcastGameState(oldRoomId, {
+            type: 'player-left',
+            player: socket.playerName,
+            message: `${socket.playerName} left the game`
           });
         }
       }
@@ -155,9 +144,10 @@ io.on('connection', (socket) => {
 
       // Broadcast to room that a new player has joined (only if not reconnecting)
       if (!result.reconnected) {
-        socket.to(result.roomId).emit('player-joined', {
-          playerName: socket.playerName,
-          gameState: result.game
+        roomManager.broadcastGameState(result.roomId, {
+          type: 'player-joined',
+          player: socket.playerName,
+          message: `${socket.playerName} joined the game`
         });
       }
     } else {
@@ -175,21 +165,7 @@ io.on('connection', (socket) => {
 
     const result = roomManager.startGame(socket.roomId, socket.playerId);
     
-    if (result.success) {
-      // Get updated game state for all players
-      const game = roomManager.getRoom(socket.roomId);
-      
-      // Send personalized game state to each player
-      game.players.forEach(player => {
-        const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
-        const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
-        if (playerSocket) {
-          playerSocket.emit('game-started', {
-            gameState: game.getPlayerGameState(player.id)
-          });
-        }
-      });
-    } else {
+    if (!result.success) {
       socket.emit('error', { message: result.message });
     }
   });
@@ -209,25 +185,6 @@ io.on('connection', (socket) => {
     );
 
     if (result.success) {
-      const game = roomManager.getRoom(socket.roomId);
-      
-      // Send updated game state to all players
-      game.players.forEach(player => {
-        const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
-        const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
-        if (playerSocket) {
-          playerSocket.emit('game-updated', {
-            gameState: game.getPlayerGameState(player.id),
-            action: {
-              type: 'card-played',
-              player: socket.playerName,
-              message: result.message,
-              data: result.data
-            }
-          });
-        }
-      });
-
       // Handle special responses
       if (result.data && result.data.topCards) {
         // See Future card - only send to player who played it
@@ -255,26 +212,7 @@ io.on('connection', (socket) => {
       data.additionalData
     );
 
-    if (result.success) {
-      const game = roomManager.getRoom(socket.roomId);
-      
-      // Send updated game state to all players
-      game.players.forEach(player => {
-        const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
-        const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
-        if (playerSocket) {
-          playerSocket.emit('game-updated', {
-            gameState: game.getPlayerGameState(player.id),
-            action: {
-              type: 'multiple-cards-played',
-              player: socket.playerName,
-              message: result.message,
-              data: result.data
-            }
-          });
-        }
-      });
-    } else {
+    if (!result.success) {
       socket.emit('error', { message: result.message });
     }
   });
@@ -289,25 +227,6 @@ io.on('connection', (socket) => {
     const result = roomManager.drawCard(socket.playerId);
 
     if (result.success) {
-      const game = roomManager.getRoom(socket.roomId);
-      
-      // Send updated game state to all players
-      game.players.forEach(player => {
-        const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
-        const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
-        if (playerSocket) {
-          playerSocket.emit('game-updated', {
-            gameState: game.getPlayerGameState(player.id),
-            action: {
-              type: 'card-drawn',
-              player: socket.playerName,
-              message: result.message,
-              data: result.data
-            }
-          });
-        }
-      });
-
       // Handle exploding kitten
       if (result.data && result.data.exploded) {
         socket.emit('player-exploded', {
@@ -329,25 +248,7 @@ io.on('connection', (socket) => {
 
     const result = roomManager.respondToPendingAction(socket.playerId, data);
 
-    if (result.success) {
-      const game = roomManager.getRoom(socket.roomId);
-      
-      // Send updated game state to all players
-      game.players.forEach(player => {
-        const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
-        const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
-        if (playerSocket) {
-          playerSocket.emit('game-updated', {
-            gameState: game.getPlayerGameState(player.id),
-            action: {
-              type: 'action-response',
-              player: socket.playerName,
-              message: result.message
-            }
-          });
-        }
-      });
-    } else {
+    if (!result.success) {
       socket.emit('error', { message: result.message });
     }
   });
@@ -379,20 +280,10 @@ io.on('connection', (socket) => {
     const result = roomManager.resetGame(socket.roomId, socket.playerId);
     
     if (result.success) {
-      // Get updated game state for all players
-      const game = roomManager.getRoom(socket.roomId);
-      
-      // Send updated game state to all players in the room
-      game.players.forEach(player => {
-        const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
-        const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
-        if (playerSocket) {
-          playerSocket.emit('game-reset', {
-            success: true,
-            gameState: game.getPlayerGameState(player.id),
-            message: 'Game has been reset'
-          });
-        }
+      roomManager.broadcastGameState(socket.roomId, {
+        type: 'game-reset',
+        player: socket.playerName,
+        message: 'Game has been reset'
       });
     } else {
       socket.emit('error', { message: result.message });
