@@ -109,9 +109,32 @@ io.on('connection', (socket) => {
     }
 
     console.log(`Player ${socket.playerName} (${socket.playerId}) attempting to join room: ${data.roomId}`);
+    
+    // Check if player is currently in a different room
+    const currentRoom = roomManager.getPlayerRoom(socket.playerId);
+    const oldRoomId = currentRoom ? currentRoom.roomId : null;
+    
     const result = roomManager.joinRoom(data.roomId, socket.playerId, socket.playerName, socket.id);
     
     if (result.success) {
+      // If player left an old room to join this new room, notify the old room
+      if (oldRoomId && oldRoomId !== result.roomId && !result.reconnected) {
+        const oldRoom = roomManager.getRoom(oldRoomId);
+        if (oldRoom) {
+          // Notify remaining players in the old room that this player left
+          oldRoom.players.forEach(player => {
+            const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
+            const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
+            if (playerSocket) {
+              playerSocket.emit('player-left', {
+                playerName: socket.playerName,
+                gameState: oldRoom.getPlayerGameState(player.id)
+              });
+            }
+          });
+        }
+      }
+      
       // Leave previous room if any
       if (socket.roomId) {
         socket.leave(socket.roomId);
@@ -212,6 +235,45 @@ io.on('connection', (socket) => {
           topCards: result.data.topCards
         });
       }
+    } else {
+      socket.emit('error', { message: result.message });
+    }
+  });
+
+  // Handle multiple card play (for cat cards)
+  socket.on('play-multiple-cards', (data) => {
+    if (!socket.playerId) {
+      socket.emit('error', { message: 'Player ID not set' });
+      return;
+    }
+
+    const result = roomManager.playMultipleCards(
+      socket.playerId,
+      data.cardIds,
+      data.primaryCardId,
+      data.targetPlayerId,
+      data.additionalData
+    );
+
+    if (result.success) {
+      const game = roomManager.getRoom(socket.roomId);
+      
+      // Send updated game state to all players
+      game.players.forEach(player => {
+        const playerSocketId = roomManager.getSocketFromPlayerId(player.id);
+        const playerSocket = playerSocketId ? io.sockets.sockets.get(playerSocketId) : null;
+        if (playerSocket) {
+          playerSocket.emit('game-updated', {
+            gameState: game.getPlayerGameState(player.id),
+            action: {
+              type: 'multiple-cards-played',
+              player: socket.playerName,
+              message: result.message,
+              data: result.data
+            }
+          });
+        }
+      });
     } else {
       socket.emit('error', { message: result.message });
     }

@@ -98,12 +98,13 @@ class RoomManager {
     this.playerRooms.delete(playerId);
     this.cleanupPlayerMappings(playerId);
 
-    // If room is empty and game hasn't started, remove the room
-    if (game.players.length === 0 && game.gameState === 'waiting') {
+    // If room is empty, remove the room regardless of game state
+    if (game.players.length === 0) {
       this.rooms.delete(roomId);
+      console.log(`Room ${roomId} removed - no players remaining`);
     }
 
-    return { success: true };
+    return { success: true, roomRemoved: game.players.length === 0 };
   }
 
   getPlayerRoom(playerId) {
@@ -160,6 +161,22 @@ class RoomManager {
     }
 
     return game.playCard(actualPlayerId, cardId, targetPlayerId, additionalData);
+  }
+
+  playMultipleCards(playerId, cardIds, primaryCardId, targetPlayerId = null, additionalData = null) {
+    // Handle both socket ID and player ID
+    const actualPlayerId = this.socketToPlayer.get(playerId) || playerId;
+    const roomId = this.playerRooms.get(actualPlayerId);
+    if (!roomId) {
+      return { success: false, message: 'Player not in any room' };
+    }
+
+    const game = this.rooms.get(roomId);
+    if (!game) {
+      return { success: false, message: 'Room not found' };
+    }
+
+    return game.playMultipleCards(actualPlayerId, cardIds, primaryCardId, targetPlayerId, additionalData);
   }
 
   drawCard(playerId) {

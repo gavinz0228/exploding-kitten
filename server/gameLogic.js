@@ -9,6 +9,7 @@ class Game {
     this.gameState = 'waiting'; // waiting, playing, finished
     this.turnsRemaining = 1; // For attack cards
     this.pendingAction = null; // For cards that require responses
+    this.nopeWindow = null; // For nope card responses
     this.gameLog = [];
     this.winner = null;
     this.maxPlayers = 5;
@@ -132,14 +133,150 @@ class Game {
     const result = this.executeCardAction(player, card, targetPlayerId, additionalData);
     
     if (result.success) {
-      // Remove card from hand and add to discard pile
-      player.hand.splice(cardIndex, 1);
-      this.deck.discard(card);
+      // For cat cards, the card removal is handled inside handleCatCard
+      // For other cards, remove the card here
+      if (!card.isCat) {
+        player.hand.splice(cardIndex, 1);
+        this.deck.discard(card);
+      }
       
       this.addToLog(`${player.name} played ${card.type}`);
     }
 
     return result;
+  }
+
+  playMultipleCards(playerId, cardIds, primaryCardId, targetPlayerId = null, additionalData = null) {
+    if (this.gameState !== 'playing') {
+      return { success: false, message: 'Game not in progress' };
+    }
+
+    const player = this.getPlayer(playerId);
+    if (!player || !player.isAlive) {
+      return { success: false, message: 'Player not found or eliminated' };
+    }
+
+    if (this.getCurrentPlayer().id !== playerId) {
+      return { success: false, message: 'Not your turn' };
+    }
+
+    // Validate that all cards exist in player's hand
+    const cards = [];
+    for (const cardId of cardIds) {
+      const card = player.hand.find(c => c.id === cardId);
+      if (!card) {
+        return { success: false, message: `Card ${cardId} not found in hand` };
+      }
+      cards.push(card);
+    }
+
+    // Validate that all cards are the same type and are cat cards
+    const cardTypes = [...new Set(cards.map(c => c.type))];
+    if (cardTypes.length > 1) {
+      return { success: false, message: 'All cards must be of the same type' };
+    }
+
+    const cardType = cardTypes[0];
+    const primaryCard = cards.find(c => c.id === primaryCardId);
+    if (!primaryCard) {
+      return { success: false, message: 'Primary card not found in selection' };
+    }
+
+    if (!primaryCard.isCat) {
+      return { success: false, message: 'Multiple card play only allowed for cat cards' };
+    }
+
+    // Validate card count requirements
+    if (cards.length < 2) {
+      return { success: false, message: 'Need at least 2 matching cards to steal' };
+    }
+
+    if (cards.length > 3) {
+      return { success: false, message: 'Cannot play more than 3 cards at once' };
+    }
+
+    // Execute the cat card action with multiple cards
+    const result = this.executeMultipleCatCardAction(player, cards, primaryCard, targetPlayerId, additionalData);
+    
+    if (result.success) {
+      this.addToLog(`${player.name} played ${cards.length} ${cardType} cards`);
+    }
+
+    return result;
+  }
+
+  executeMultipleCatCardAction(player, cards, primaryCard, targetPlayerId, additionalData) {
+    if (!targetPlayerId) {
+      return { success: false, message: 'Must select a target player to steal from' };
+    }
+
+    const targetPlayer = this.getPlayer(targetPlayerId);
+    if (!targetPlayer || !targetPlayer.isAlive || targetPlayer.id === player.id) {
+      return { success: false, message: 'Invalid target player' };
+    }
+
+    if (targetPlayer.hand.length === 0) {
+      return { success: false, message: 'Target player has no cards' };
+    }
+
+    // Remove all selected cards from hand and discard them
+    cards.forEach(card => {
+      const cardIndex = player.hand.findIndex(c => c.id === card.id);
+      if (cardIndex !== -1) {
+        player.hand.splice(cardIndex, 1);
+        this.deck.discard(card);
+      }
+    });
+
+    // Determine steal type based on number of cards
+    if (cards.length === 3 && additionalData && additionalData.namedSteal) {
+      // Named steal with 3 cards
+      return this.executeNamedSteal(player, targetPlayer, additionalData.cardName);
+    } else {
+      // Random steal with 2 or 3 cards (if 3 cards but not named steal, treat as random)
+      return this.executeRandomSteal(player, targetPlayer);
+    }
+  }
+
+  executeRandomSteal(player, targetPlayer) {
+    // Steal a random card
+    const randomIndex = Math.floor(Math.random() * targetPlayer.hand.length);
+    const stolenCard = targetPlayer.hand.splice(randomIndex, 1)[0];
+    player.hand.push(stolenCard);
+
+    this.addToLog(`${player.name} stole a random card from ${targetPlayer.name}`);
+    
+    return { 
+      success: true, 
+      message: `Stole a random card from ${targetPlayer.name}`,
+      data: { stolenCard }
+    };
+  }
+
+  executeNamedSteal(player, targetPlayer, cardName) {
+    // Look for the named card in target player's hand
+    const targetCardIndex = targetPlayer.hand.findIndex(c => c.type === cardName);
+    
+    if (targetCardIndex === -1) {
+      this.addToLog(`${player.name} tried to steal ${cardName} from ${targetPlayer.name} but they don't have it`);
+      return { 
+        success: true, 
+        message: `${targetPlayer.name} doesn't have a ${cardName}`,
+        data: { namedStealFailed: true }
+      };
+    }
+
+    // Steal the named card
+    const stolenCard = targetPlayer.hand.splice(targetCardIndex, 1)[0];
+    player.hand.push(stolenCard);
+
+    this.addToLog(`${player.name} stole ${stolenCard.type} from ${targetPlayer.name}`);
+    
+    return { 
+      success: true, 
+      message: `Stole ${stolenCard.type} from ${targetPlayer.name}`,
+      data: { stolenCard, namedSteal: true }
+    };
   }
 
   executeCardAction(player, card, targetPlayerId, additionalData) {
@@ -149,8 +286,9 @@ class Game {
         return { success: true, message: 'Turn skipped' };
 
       case 'attack':
-        this.turnsRemaining = 2;
+        // End current turn and set next player to have 2 turns
         this.endTurn();
+        this.turnsRemaining = 2;
         return { success: true, message: 'Next player takes 2 turns' };
 
       case 'see_future':
@@ -192,25 +330,24 @@ class Game {
         };
 
       case 'nope':
-        // Nope cards are handled differently - they interrupt other actions
-        return { success: false, message: 'Nope can only be played in response to other cards' };
+        if (!this.nopeWindow) {
+          return { success: false, message: 'Nope can only be played in response to other cards' };
+        }
+        return this.playNopeCard(player);
 
       default:
-        // Cat cards - check for pairs
-        if (card.isCat) {
-          return this.handleCatCard(player, card, targetPlayerId);
-        }
-        
-        return { success: false, message: 'Unknown card type' };
+        // Any card can be used for stealing if you have pairs
+        return this.handleMatchingCards(player, card, targetPlayerId, additionalData);
     }
   }
 
-  handleCatCard(player, card, targetPlayerId) {
-    // Count matching cat cards in hand
+  handleCatCard(player, card, targetPlayerId, additionalData = null) {
+    // Count matching cat cards in hand (including the one being played)
     const matchingCards = player.hand.filter(c => c.type === card.type);
+    const totalMatchingCards = matchingCards.length; // The card being played is in the hand
     
-    if (matchingCards.length < 1) { // Need at least 2 total (including the one being played)
-      return { success: false, message: 'Need a pair of cat cards to steal' };
+    if (totalMatchingCards < 2) {
+      return { success: false, message: 'Need at least 2 matching cat cards to steal' };
     }
 
     if (!targetPlayerId) {
@@ -226,11 +363,27 @@ class Game {
       return { success: false, message: 'Target player has no cards' };
     }
 
-    // Remove the matching card from hand
+    // Check if using 3 matching cards for named steal
+    if (totalMatchingCards >= 3 && additionalData && additionalData.namedSteal) {
+      return this.handleNamedSteal(player, card, targetPlayer, additionalData.cardName);
+    }
+
+    // Regular steal with 2 matching cards
+    // Remove the card being played
+    const playedCardIndex = player.hand.findIndex(c => c.id === card.id);
+    if (playedCardIndex !== -1) {
+      player.hand.splice(playedCardIndex, 1);
+      this.deck.discard(card);
+    }
+
+    // Remove one matching card from hand (for 2-card steal)
     const matchingCardIndex = player.hand.findIndex(c => c.type === card.type && c.id !== card.id);
     if (matchingCardIndex !== -1) {
       const matchingCard = player.hand.splice(matchingCardIndex, 1)[0];
       this.deck.discard(matchingCard);
+    } else {
+      // This should not happen with the checks above, but as a safeguard
+      return { success: false, message: 'Internal error: matching card not found for steal action.' };
     }
 
     // Steal a random card
@@ -238,12 +391,182 @@ class Game {
     const stolenCard = targetPlayer.hand.splice(randomIndex, 1)[0];
     player.hand.push(stolenCard);
 
-    this.addToLog(`${player.name} stole a card from ${targetPlayer.name}`);
+    this.addToLog(`${player.name} stole a random card from ${targetPlayer.name}`);
     
     return { 
       success: true, 
-      message: `Stole a card from ${targetPlayer.name}`,
+      message: `Stole a random card from ${targetPlayer.name}`,
       data: { stolenCard }
+    };
+  }
+
+  handleMatchingCards(player, card, targetPlayerId, additionalData = null) {
+    // Count matching cards in hand (including the one being played)
+    const matchingCards = player.hand.filter(c => c.type === card.type);
+    const totalMatchingCards = matchingCards.length; // The card being played is in the hand
+    
+    // If only one card, play it for its original effect
+    if (totalMatchingCards === 1) {
+      // Single card - play for original effect
+      return this.executeSingleCardEffect(player, card, targetPlayerId, additionalData);
+    }
+
+    // Two or more matching cards - can be used for stealing
+    if (!targetPlayerId) {
+      return { success: false, message: 'Must select a target player to steal from' };
+    }
+
+    const targetPlayer = this.getPlayer(targetPlayerId);
+    if (!targetPlayer || !targetPlayer.isAlive || targetPlayer.id === player.id) {
+      return { success: false, message: 'Invalid target player' };
+    }
+
+    if (targetPlayer.hand.length === 0) {
+      return { success: false, message: 'Target player has no cards' };
+    }
+
+    // Check if using 3 matching cards for named steal (only for cat cards)
+    if (totalMatchingCards >= 3 && card.isCat && additionalData && additionalData.namedSteal) {
+      return this.handleNamedSteal(player, card, targetPlayer, additionalData.cardName);
+    }
+
+    // Regular steal with 2 matching cards (any card type)
+    // Remove the card being played
+    const playedCardIndex = player.hand.findIndex(c => c.id === card.id);
+    if (playedCardIndex !== -1) {
+      player.hand.splice(playedCardIndex, 1);
+      this.deck.discard(card);
+    }
+
+    // Remove one matching card from hand (for 2-card steal)
+    const matchingCardIndex = player.hand.findIndex(c => c.type === card.type && c.id !== card.id);
+    if (matchingCardIndex !== -1) {
+      const matchingCard = player.hand.splice(matchingCardIndex, 1)[0];
+      this.deck.discard(matchingCard);
+    } else {
+      // This should not happen with the checks above, but as a safeguard
+      return { success: false, message: 'Internal error: matching card not found for steal action.' };
+    }
+
+    // Steal a random card
+    const randomIndex = Math.floor(Math.random() * targetPlayer.hand.length);
+    const stolenCard = targetPlayer.hand.splice(randomIndex, 1)[0];
+    player.hand.push(stolenCard);
+
+    this.addToLog(`${player.name} used 2 ${card.type} cards to steal a random card from ${targetPlayer.name}`);
+    
+    return { 
+      success: true, 
+      message: `Stole a random card from ${targetPlayer.name}`,
+      data: { stolenCard }
+    };
+  }
+
+  executeSingleCardEffect(player, card, targetPlayerId, additionalData) {
+    // Handle single card effects for their original purpose
+    switch (card.type) {
+      case 'skip':
+        this.endTurn();
+        return { success: true, message: 'Turn skipped' };
+
+      case 'attack':
+        // End current turn and set next player to have 2 turns
+        this.endTurn();
+        this.turnsRemaining = 2;
+        return { success: true, message: 'Next player takes 2 turns' };
+
+      case 'see_future':
+        const topCards = this.deck.peekTop(3);
+        return { 
+          success: true, 
+          message: 'Saw the future',
+          data: { topCards }
+        };
+
+      case 'shuffle':
+        this.deck.shuffle();
+        return { success: true, message: 'Deck shuffled' };
+
+      case 'favor':
+        if (!targetPlayerId) {
+          return { success: false, message: 'Must select a target player' };
+        }
+        const targetPlayer = this.getPlayer(targetPlayerId);
+        if (!targetPlayer || !targetPlayer.isAlive || targetPlayer.id === player.id) {
+          return { success: false, message: 'Invalid target player' };
+        }
+        if (targetPlayer.hand.length === 0) {
+          return { success: false, message: 'Target player has no cards' };
+        }
+        
+        // Set pending action for target to choose a card
+        this.pendingAction = {
+          type: 'favor',
+          fromPlayer: player.id,
+          toPlayer: targetPlayerId,
+          message: `${player.name} is asking for a card`
+        };
+        
+        return { 
+          success: true, 
+          message: `Asking ${targetPlayer.name} for a card`,
+          requiresResponse: true
+        };
+
+      default:
+        // Cat cards played alone
+        if (card.isCat) {
+          return { success: false, message: 'Cat cards need at least 2 matching cards to steal' };
+        }
+        return { success: false, message: 'Unknown card type' };
+    }
+  }
+
+  handleNamedSteal(player, card, targetPlayer, cardName) {
+    // Remove the card being played
+    const playedCardIndex = player.hand.findIndex(c => c.id === card.id);
+    if (playedCardIndex !== -1) {
+      player.hand.splice(playedCardIndex, 1);
+      this.deck.discard(card);
+    }
+
+    // Remove two matching cards from hand (for 3-card named steal)
+    let removedCount = 0;
+    for (let i = player.hand.length - 1; i >= 0 && removedCount < 2; i--) {
+      if (player.hand[i].type === card.type && player.hand[i].id !== card.id) {
+        const matchingCard = player.hand.splice(i, 1)[0];
+        this.deck.discard(matchingCard);
+        removedCount++;
+      }
+    }
+
+    if (removedCount < 2) {
+      // This should not happen with the checks above, but as a safeguard
+      return { success: false, message: 'Internal error: not enough matching cards for named steal.' };
+    }
+
+    // Look for the named card in target player's hand
+    const targetCardIndex = targetPlayer.hand.findIndex(c => c.type === cardName);
+    
+    if (targetCardIndex === -1) {
+      this.addToLog(`${player.name} tried to steal ${cardName} from ${targetPlayer.name} but they don't have it`);
+      return { 
+        success: true, 
+        message: `${targetPlayer.name} doesn't have a ${cardName}`,
+        data: { namedStealFailed: true }
+      };
+    }
+
+    // Steal the named card
+    const stolenCard = targetPlayer.hand.splice(targetCardIndex, 1)[0];
+    player.hand.push(stolenCard);
+
+    this.addToLog(`${player.name} stole ${stolenCard.type} from ${targetPlayer.name}`);
+    
+    return { 
+      success: true, 
+      message: `Stole ${stolenCard.type} from ${targetPlayer.name}`,
+      data: { stolenCard, namedSteal: true }
     };
   }
 

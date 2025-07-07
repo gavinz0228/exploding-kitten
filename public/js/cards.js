@@ -76,11 +76,11 @@ class CardRenderer {
             'nope': 'Stop any action except Exploding Kitten or Defuse.',
             'defuse': 'Use to defuse an Exploding Kitten.',
             'exploding_kitten': 'You explode! Game over unless you defuse.',
-            'tacocat': 'Cat card - collect pairs to steal cards.',
-            'rainbow_cat': 'Cat card - collect pairs to steal cards.',
-            'potato_cat': 'Cat card - collect pairs to steal cards.',
-            'beard_cat': 'Cat card - collect pairs to steal cards.',
-            'cattermelon': 'Cat card - collect pairs to steal cards.'
+            'tacocat': 'Cat card - 2 matching: steal random card, 3 matching: name a card to steal.',
+            'rainbow_cat': 'Cat card - 2 matching: steal random card, 3 matching: name a card to steal.',
+            'potato_cat': 'Cat card - 2 matching: steal random card, 3 matching: name a card to steal.',
+            'beard_cat': 'Cat card - 2 matching: steal random card, 3 matching: name a card to steal.',
+            'cattermelon': 'Cat card - 2 matching: steal random card, 3 matching: name a card to steal.'
         };
         return descriptions[cardType] || 'Unknown card';
     }
@@ -112,6 +112,11 @@ class CardRenderer {
 
     static isCatCard(cardType) {
         return ['tacocat', 'rainbow_cat', 'potato_cat', 'beard_cat', 'cattermelon'].includes(cardType);
+    }
+
+    static canBeUsedForStealing(cardType) {
+        // Any card type can be used for stealing if you have pairs
+        return !['exploding_kitten', 'defuse', 'nope'].includes(cardType);
     }
 
     static canPlayCard(cardType, gameState, playerId) {
