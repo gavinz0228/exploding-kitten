@@ -120,25 +120,29 @@ class CardRenderer {
     }
 
     static canPlayCard(cardType, gameState, playerId) {
-        // Check if it's the player's turn
-        if (!gameState.isMyTurn) {
-            return { canPlay: false, reason: "Not your turn" };
-        }
-
-        // Check for pending actions
-        if (gameState.pendingAction) {
-            return { canPlay: false, reason: "Waiting for response to previous action" };
-        }
-
         // Special rules for specific cards
         switch (cardType) {
             case 'nope':
+                // Nope can be played by any player when there's a nope window
+                if (gameState.nopeWindow) {
+                    return { canPlay: true, reason: "Can nope the current action" };
+                }
                 return { canPlay: false, reason: "Nope can only be played in response to other cards" };
             
             case 'defuse':
                 return { canPlay: false, reason: "Defuse can only be used when drawing an Exploding Kitten" };
             
             default:
+                // For other cards, check if it's the player's turn
+                if (!gameState.isMyTurn) {
+                    return { canPlay: false, reason: "Not your turn" };
+                }
+
+                // Check for pending actions
+                if (gameState.pendingAction) {
+                    return { canPlay: false, reason: "Waiting for response to previous action" };
+                }
+
                 return { canPlay: true };
         }
     }

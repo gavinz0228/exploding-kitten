@@ -753,6 +753,57 @@ class Game {
     return { success: true, message: 'Game reset successfully' };
   }
 
+  playNopeCard(player) {
+    if (!this.nopeWindow) {
+      return { success: false, message: 'No action to nope' };
+    }
+
+    // Remove nope card from player's hand
+    const nopeIndex = player.hand.findIndex(card => card.type === 'nope');
+    if (nopeIndex === -1) {
+      return { success: false, message: 'Nope card not found in hand' };
+    }
+
+    const nopeCard = player.hand.splice(nopeIndex, 1)[0];
+    this.deck.discard(nopeCard);
+
+    // Cancel the action
+    const cancelledAction = this.nopeWindow.action;
+    this.nopeWindow = null;
+
+    this.addToLog(`${player.name} played Nope! ${cancelledAction} was cancelled.`);
+
+    return {
+      success: true,
+      message: `Noped! ${cancelledAction} was cancelled.`,
+      data: { noped: true, cancelledAction }
+    };
+  }
+
+  createNopeWindow(action, excludePlayerId = null) {
+    // Create a window for players to play nope cards
+    this.nopeWindow = {
+      action: action,
+      excludePlayerId: excludePlayerId,
+      timeout: setTimeout(() => {
+        // If no one nopes within 5 seconds, the action proceeds
+        this.nopeWindow = null;
+      }, 5000)
+    };
+
+    return this.nopeWindow;
+  }
+
+  canPlayNope(playerId) {
+    if (!this.nopeWindow) return false;
+    if (this.nopeWindow.excludePlayerId === playerId) return false;
+    
+    const player = this.getPlayer(playerId);
+    if (!player || !player.isAlive) return false;
+    
+    return player.hand.some(card => card.type === 'nope');
+  }
+
   addToLog(message) {
     this.gameLog.push({
       timestamp: Date.now(),

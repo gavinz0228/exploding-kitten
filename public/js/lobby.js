@@ -11,7 +11,29 @@ class LobbyManager {
     init() {
         this.setupSocketConnection();
         this.setupEventListeners();
-        this.showNameSetup();
+        this.checkExistingPlayer();
+    }
+
+    checkExistingPlayer() {
+        // Check if we have stored player information
+        const storedPlayerName = sessionStorage.getItem('playerName');
+        const storedPlayerId = sessionStorage.getItem('playerId');
+        
+        if (storedPlayerName && storedPlayerId) {
+            // Auto-join lobby with existing credentials
+            this.playerName = storedPlayerName;
+            this.playerId = storedPlayerId;
+            
+            this.showLoading('Reconnecting...');
+            
+            this.socket.emit('join-lobby', { 
+                playerName: this.playerName,
+                playerId: this.playerId
+            });
+        } else {
+            // Show name setup for new users
+            this.showNameSetup();
+        }
     }
 
     setupSocketConnection() {
