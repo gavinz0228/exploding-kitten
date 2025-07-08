@@ -139,7 +139,7 @@ class Game {
     if (card.type === 'nope') {
       if (!this.nopeWindow) {
         console.log(`[playCard] Nope can only be played in response to other cards: playerId=${playerId}, cardId=${cardId}, cardType=${card.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
-        return { success: false, message: '4 Nope can only be played in response to other cards' };
+        return { success: false, message: 'Server:playCard Nope can only be played in response to other cards' };
       }
       if (this.nopeWindow.excludePlayerId === playerId) {
         console.log(`[playCard] Player tried to nope their own action`);
@@ -204,7 +204,7 @@ class Game {
     if (firstCard && firstCard.type === 'nope') {
       if (!this.nopeWindow) {
         console.log(`[playMultipleCards] Nope can only be played in response to other cards: playerId=${playerId}, cardId=${cardIds[0]}, cardType=${firstCard.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
-        return { success: false, message: '3 Nope can only be played in response to other cards' };
+        return { success: false, message: 'Server:playMultipleCards Nope can only be played in response to other cards' };
       }
       if (this.nopeWindow.excludePlayerId === playerId) {
         console.log(`[playMultipleCards] Player tried to nope their own action`);
@@ -440,7 +440,7 @@ class Game {
       case 'nope':
         if (!this.nopeWindow) {
           console.log("Nope played when no nope window is open");
-          return { success: false, message: '2 Nope can only be played in response to other cards' };
+          return { success: false, message: 'Server: Nope can only be played in response to other cards' };
         }
         return this.playNopeCard(player);
 

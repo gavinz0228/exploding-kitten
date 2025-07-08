@@ -131,8 +131,8 @@ class CardRenderer {
                     }
                     return { canPlay: true, reason: "Can nope the current action" };
                 }
-                console.log("Nope played when no nope window is open " + gameState.nopeWindow);
-                return { canPlay: false, reason: "1 Nope can only be played in response to other cards" };
+                console.log("nope window: " + gameState.nopeWindow);
+                return { canPlay: false, reason: "Client: Nope can only be played in response to other cards" };
             
             case 'defuse':
                 return { canPlay: false, reason: "Defuse can only be used when drawing an Exploding Kitten" };
