@@ -111,7 +111,15 @@ class LobbyManager {
             if (e.key === 'Enter') this.setPlayerName();
         });
 
-        // Room creation
+        // Change name
+        const changeNameBtn = document.getElementById('change-name-btn');
+        const newNameInput = document.getElementById('new-player-name');
+
+        changeNameBtn.addEventListener('click', () => this.changePlayerName());
+        newNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.changePlayerName();
+        });
+
         const createRoomBtn = document.getElementById('create-room-btn');
         createRoomBtn.addEventListener('click', () => this.createRoom());
 
@@ -163,6 +171,26 @@ class LobbyManager {
             playerName: name,
             playerId: existingPlayerId
         });
+    }
+
+    changePlayerName() {
+        const newNameInput = document.getElementById('new-player-name');
+        const newName = newNameInput.value.trim();
+
+        if (!newName) {
+            this.showStatus('Please enter a new name', 'error');
+            return;
+        }
+
+        if (newName.length > 20) {
+            this.showStatus('Name must be 20 characters or less', 'error');
+            return;
+        }
+
+        this.playerName = newName;
+        sessionStorage.setItem('playerName', this.playerName);
+        document.getElementById('display-name').textContent = this.playerName;
+        this.showStatus('Name changed successfully!', 'success');
     }
 
     createRoom() {
