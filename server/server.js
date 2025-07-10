@@ -35,6 +35,14 @@ app.get('/game/:roomId?', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/game.html'));
 });
 
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
+
 // Serve static files (must come after API routes)
 app.use(express.static(path.join(__dirname, '../public')));
 
