@@ -26,7 +26,7 @@ class Game {
       return { success: false, message: 'Game is full' };
     }
 
-    if (this.gameState !== 'waiting') {
+    if (this.gameState !== 'waiting' && this.gameState !== 'finished') {
       return { success: false, message: 'Game already in progress' };
     }
 
@@ -114,24 +114,23 @@ class Game {
   }
 
   playCard(playerId, cardId, targetPlayerId = null, additionalData = null) {
-    console.log(`[playCard] playerId=${playerId}, cardId=${cardId}, targetPlayerId=${targetPlayerId}, additionalData=${JSON.stringify(additionalData)}`);
-    if (this.gameState !== 'playing') {
-      console.log(`[playCard] Game not in progress`);
-      return { success: false, message: 'Game not in progress' };
-    }
-
     const player = this.getPlayer(playerId);
     if (!player || !player.isAlive) {
       console.log(`[playCard] Player not found or eliminated: ${playerId}`);
       return { success: false, message: 'Player not found or eliminated' };
     }
-
+    if (this.gameState !== 'playing') {
+      console.log(`[playCard] Game not in progress`);
+      return { success: false, message: 'Game not in progress' };
+    }
+    
     const cardIndex = player.hand.findIndex(card => card.id === cardId);
     if (cardIndex === -1) {
       console.log(`[playCard] Card not found in hand: ${cardId}`);
       return { success: false, message: 'Card not found in hand' };
     }
     const card = player.hand[cardIndex];
+    console.log(`[playCard] ${player.name} is playing ${card.type} card${targetPlayerId ? ` on ${this.getPlayer(targetPlayerId).name}` : ''}`);
 
     console.log(`[playCard] cardType=${card.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
 
@@ -296,6 +295,11 @@ class Game {
       }
     });
 
+    this.addToLog(`${player.name} is attempting to play Steal on ${targetPlayer.name}`);
+    if (typeof this.broadcastCallback === 'function') {
+      this.broadcastCallback({ type: 'steal-attempt', message: `${player.name} is attempting to play Steal on ${targetPlayer.name}` });
+    }
+
     // Determine steal type based on number of cards
     if (cards.length === 3 && additionalData && additionalData.namedSteal) {
       // Named steal with 3 cards
@@ -304,6 +308,7 @@ class Game {
       // Random steal with 2 or 3 cards (if 3 cards but not named steal, treat as random)
       // Open a nope window for random steal
       let stealResolved = false;
+      this.addToLog(`${player.name} is attempting a random steal from ${targetPlayer.name}`);
       let result = { success: true, message: 'Random steal in progress', data: { nopeable: true, action: 'random_steal' } };
       this.createNopeWindow('Random Steal', player.id, () => {
         if (!stealResolved) {
@@ -367,10 +372,13 @@ class Game {
         // Create nope window for skip action
         this.createNopeWindow('Skip', player.id, () => {
           this.endTurn();
+          if (typeof this.broadcastCallback === 'function') {
+            this.broadcastCallback({ type: 'favor-attempt', message: `${player.name} is attempting to play Favor on ${targetPlayer.name}` });
+          }
         });
         return { 
           success: true, 
-          message: 'Turn skipped',
+          message: `${player.name} played Skip card`,
           data: { nopeable: true, action: 'skip' }
         };
 
@@ -382,7 +390,7 @@ class Game {
         });
         return { 
           success: true, 
-          message: 'Next player takes 2 turns',
+          message: `${player.name} played Attack card, next player takes 2 turns`,
           data: { nopeable: true, action: 'attack' }
         };
 
@@ -394,7 +402,7 @@ class Game {
         });
         return { 
           success: true, 
-          message: 'Saw the future',
+          message: `${player.name} played See Future card`,
           data: { topCards, nopeable: true, action: 'see_future' }
         };
 
@@ -405,7 +413,7 @@ class Game {
         });
         return { 
           success: true, 
-          message: 'Deck shuffled',
+          message: `${player.name} played Shuffle card`,
           data: { nopeable: true, action: 'shuffle' }
         };
 
@@ -429,11 +437,13 @@ class Game {
             toPlayer: targetPlayerId,
             message: `${player.name} is asking for a card`
           };
+          this.addToLog(`${player.name} is attempting to play Favor on ${targetPlayer.name}`);
+          this.addToLog(`${player.name} played Favor targeting ${targetPlayer.name}`);
         });
         
         return { 
           success: true, 
-          message: `Asking ${targetPlayer.name} for a card`,
+          message: `${player.name} played Favor card on ${targetPlayer.name}`,
           data: { nopeable: true, action: 'favor', targetPlayer: targetPlayer.name }
         };
 
@@ -729,13 +739,31 @@ class Game {
         player.isAlive = false;
         this.addToLog(`${player.name} exploded!`);
         
-        const gameEnded = this.checkGameEnd();
-        
-        return {
-          success: true,
-          message: 'You exploded!',
-          data: { exploded: true, gameEnded }
-        };
+        player.isAlive = false;
+        this.addToLog(`${player.name} exploded!`);
+
+        const alivePlayers = this.players.filter(p => p.isAlive);
+        if (alivePlayers.length > 1) {
+          // Allow the eliminated player to place the exploding kitten back
+          this.pendingAction = {
+            type: 'place_exploding_kitten',
+            player: playerId,
+            card: drawnCard,
+            message: 'Choose where to place the Exploding Kitten in the deck'
+          };
+          return {
+            success: true,
+            message: 'You exploded! Place the Exploding Kitten back in the deck.',
+            data: { exploded: true, requiresResponse: true }
+          };
+        } else {
+          const gameEnded = this.checkGameEnd();
+          return {
+            success: true,
+            message: 'You exploded!',
+            data: { exploded: true, gameEnded }
+          };
+        }
       }
     } else {
       // Normal card
@@ -904,6 +932,11 @@ class Game {
       `${player.name} played Nope! ${this.nopeWindow.action} is currently cancelled.`;
     
     this.addToLog(message);
+
+    // Broadcast the nope action to all players
+    if (typeof this.broadcastCallback === 'function') {
+      this.broadcastCallback({ type: 'nope-played', message });
+    }
 
     return {
       success: true,

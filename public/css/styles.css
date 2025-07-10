@@ -12,6 +12,9 @@ body {
     color: #333;
 }
 
+#deck-size {
+    color:#2d3748; /* Hide the deck size input */
+}
 .container {
     max-width: 1200px;
     margin: 0 auto;

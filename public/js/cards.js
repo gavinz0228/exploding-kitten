@@ -237,6 +237,7 @@ class CardRenderer {
 
         const handSize = document.createElement('span');
         handSize.textContent = `${player.handSize} cards`;
+        handSize.style.color = '#000000';
 
         const status = document.createElement('span');
         if (!player.isAlive) {

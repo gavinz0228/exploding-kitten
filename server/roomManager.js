@@ -52,6 +52,11 @@ class RoomManager {
     this.socketToPlayer.set(socketId, hostPlayerId);
     this.playerToSocket.set(hostPlayerId, socketId);
 
+    // Ensure the room is accessible immediately after creation
+    if (!this.rooms.has(roomId)) {
+      return { success: false, message: 'Room creation failed. Please try again.' };
+    }
+
     return {
       success: true,
       roomId,
@@ -60,6 +65,9 @@ class RoomManager {
   }
 
   joinRoom(roomId, playerId, playerName, socketId) {
+    // Remove player from previous room if they were in one
+    this.leaveRoom(playerId);
+
     const game = this.rooms.get(roomId);
     if (!game) {
       return { success: false, message: 'Room not found' };
@@ -127,7 +135,7 @@ class RoomManager {
     this.cleanupPlayerMappings(playerId);
 
     // If room is empty, remove the room regardless of game state
-    if (game.players.length === 0) {
+    if (game.players.length === 0 && game.gameState !== 'waiting' && game.gameState !== 'finished') {
       this.rooms.delete(roomId);
       console.log(`Room ${roomId} removed - no players remaining`);
     } else {
@@ -140,7 +148,15 @@ class RoomManager {
   getPlayerRoom(playerId) {
     const roomId = this.playerRooms.get(playerId);
     if (!roomId) {
-      return null;
+      // Emit an event to the client to redirect them to join the game server again
+      const socketId = this.playerToSocket.get(playerId);
+      if (socketId) {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.emit('redirect', { message: 'User not recognized. Please join the game server again.' });
+        }
+      }
+      return { success: false, message: 'User not recognized. Redirecting to join the game server again.' };
     }
 
     const game = this.rooms.get(roomId);
