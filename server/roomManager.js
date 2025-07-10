@@ -65,11 +65,9 @@ class RoomManager {
   }
 
   joinRoom(roomId, playerId, playerName, socketId) {
-    // Remove player from previous room if they were in one
-    this.leaveRoom(playerId);
-
     const game = this.rooms.get(roomId);
     if (!game) {
+      console.log(`Room ${roomId} not found for player ${playerId}`);
       return { success: false, message: 'Room not found' };
     }
 
@@ -96,6 +94,22 @@ class RoomManager {
 
     // Remove player from previous room if they were in one
     this.leaveRoom(playerId);
+
+    // Allow re-entry if the player was previously in the game
+    const player = game.getPlayer(playerId);
+    if (player) {
+      player.isAlive = true; // Mark player as active again
+      this.playerRooms.set(playerId, roomId);
+      this.socketToPlayer.set(socketId, playerId);
+      this.playerToSocket.set(playerId, socketId);
+      this.broadcastGameState(roomId, { type: 'player-rejoined', message: `${player.name} rejoined the game` });
+      return {
+        success: true,
+        roomId,
+        game: game.getPlayerGameState(playerId),
+        rejoined: true
+      };
+    }
 
     const result = game.addPlayer(playerId, playerName);
     if (!result.success) {
@@ -300,7 +314,8 @@ class RoomManager {
     return result;
   }
 
-  getRoomList() {
+  getRoomList(playerId) {
+    console.log(`Getting room list for playerId=${playerId}`);
     const roomList = [];
     this.rooms.forEach((game, roomId) => {
       roomList.push({
@@ -308,7 +323,7 @@ class RoomManager {
         playerCount: game.players.length,
         maxPlayers: game.maxPlayers,
         gameState: game.gameState,
-        canJoin: game.gameState === 'waiting' && game.players.length < game.maxPlayers
+        canJoin: (game.gameState === 'waiting' && game.players.length < game.maxPlayers) || game.players.some(p => p.id === playerId)
       });
     });
     return roomList;

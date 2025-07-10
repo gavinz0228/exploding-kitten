@@ -18,7 +18,8 @@ const roomManager = new RoomManager(io);
 
 // API Routes (must come before static files)
 app.get('/api/rooms', (req, res) => {
-  res.json(roomManager.getRoomList());
+  const playerId = req.query.playerId || req.headers['player-id'];
+  res.json(roomManager.getRoomList(playerId));
 });
 
 app.get('/api/stats', (req, res) => {

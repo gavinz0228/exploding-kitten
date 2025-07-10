@@ -228,7 +228,7 @@ class LobbyManager {
 
     async refreshRooms() {
         try {
-            const response = await fetch('/api/rooms');
+            const response = await fetch(`/api/rooms?playerId=${this.playerId}`);
             const rooms = await response.json();
             this.displayRooms(rooms);
         } catch (error) {
