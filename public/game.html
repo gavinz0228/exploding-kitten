@@ -16,9 +16,6 @@
             <div class="room-info">
                 <img src="/images/profile-picture.png" alt="Profile Picture" class="profile-picture">
                 <h1>Room: <span id="room-id"></span></h1>
-                <div class="game-status">
-                    <span id="game-state">Waiting for players...</span>
-                </div>
             </div>
             <div class="deck-info">
                 <div class="deck-count">
@@ -31,11 +28,10 @@
             </div>
         </header>
 
-        <!-- Players Area -->
-        <div class="players-area">
-            <div id="players-list" class="players-grid">
-                <!-- Players will be dynamically added here -->
-            </div>
+        <!-- Combined Status Area -->
+        <div id="status-area" class="status-area">
+            <div id="game-status-display" class="game-status-display"></div>
+            <div id="players-list" class="players-grid"></div>
         </div>
 
         <!-- Game Area -->

@@ -284,33 +284,29 @@ class GameManager {
     }
 
     updateGameStatus() {
-        const statusElement = document.getElementById('game-state');
-        const currentPlayerElement = document.getElementById('current-player');
-        const turnsElement = document.getElementById('turns-remaining');
-        const turnsCountElement = document.getElementById('turns-count');
+        const statusDisplay = document.getElementById('game-status-display');
+        const turnsElement = document.createElement('div');
+        turnsElement.className = 'turns-remaining';
+
+        let statusHTML = '';
 
         switch (this.gameState.gameState) {
             case 'waiting':
-                statusElement.textContent = 'Waiting for players...';
-                currentPlayerElement.textContent = 'Waiting...';
+                statusHTML = `<h2>Waiting for players...</h2>`;
                 break;
             case 'playing':
-                statusElement.textContent = 'Game in progress';
-                currentPlayerElement.textContent = `${this.gameState.currentPlayer}'s turn`;
-                
+                statusHTML = `<h2>${this.gameState.currentPlayer}'s turn</h2>`;
                 if (this.gameState.turnsRemaining > 1) {
-                    turnsElement.classList.remove('hidden');
-                    turnsCountElement.textContent = this.gameState.turnsRemaining;
-                } else {
-                    turnsElement.classList.add('hidden');
+                    turnsElement.innerHTML = `<span>Turns remaining: ${this.gameState.turnsRemaining}</span>`;
+                    statusHTML += turnsElement.outerHTML;
                 }
                 break;
             case 'finished':
-                statusElement.textContent = 'Game finished';
-                currentPlayerElement.textContent = `Winner: ${this.gameState.winner}`;
+                statusHTML = `<h2>Winner: ${this.gameState.winner}</h2>`;
                 this.showGameOver();
                 break;
         }
+        statusDisplay.innerHTML = statusHTML;
     }
 
     updatePlayers() {

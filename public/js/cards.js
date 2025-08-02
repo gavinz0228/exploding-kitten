@@ -232,30 +232,28 @@ class CardRenderer {
         playerName.className = 'player-name';
         playerName.textContent = player.name;
 
-        const playerStats = document.createElement('div');
-        playerStats.className = 'player-stats';
+        const playerInfo = document.createElement('div');
+        playerInfo.className = 'player-info';
 
-        const handSize = document.createElement('span');
-        handSize.textContent = `${player.handSize} cards`;
-        handSize.style.color = '#000000';
+        const cardCount = document.createElement('div');
+        cardCount.className = 'card-count';
+        cardCount.innerHTML = `<span>${player.handSize}</span> 🃏`;
 
-        const status = document.createElement('span');
+        const status = document.createElement('div');
+        status.className = 'status-icon';
         if (!player.isAlive) {
-            status.textContent = '💀 Eliminated';
-            status.style.color = '#f56565';
+            status.innerHTML = '💀 <span class="status-text">Eliminated</span>';
         } else if (isCurrentPlayer) {
-            status.textContent = '👑 Current Turn';
-            status.style.color = '#48bb78';
+            status.innerHTML = '👑 <span class="status-text">Active</span>';
         } else {
-            status.textContent = '✓ Alive';
-            status.style.color = '#48bb78';
+            status.innerHTML = '';
         }
 
-        playerStats.appendChild(handSize);
-        playerStats.appendChild(status);
+        playerInfo.appendChild(cardCount);
+        playerInfo.appendChild(status);
 
         playerCard.appendChild(playerName);
-        playerCard.appendChild(playerStats);
+        playerCard.appendChild(playerInfo);
 
         return playerCard;
     }

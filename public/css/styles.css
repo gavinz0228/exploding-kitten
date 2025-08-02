@@ -93,9 +93,16 @@ header p {
 }
 
 .game-status {
-    font-size: 1.2rem;
-    color: #5a3d2b;
-    margin-top: 5px;
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 1.8rem;
+    color: #e74c3c;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    margin-top: 10px;
+    padding: 10px 20px;
+    background: rgba(253, 250, 241, 0.8);
+    border-radius: 10px;
+    border: 2px solid #c9a47e;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
 }
 
 .deck-info {
@@ -277,49 +284,99 @@ button:disabled {
     padding: 20px;
 }
 
-/* Players Area */
-.players-area {
+/* Combined Status Area */
+.status-area {
+    background: #fdfaf1;
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    border: 4px solid #c9a47e;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+}
+
+.game-status-display {
+    text-align: center;
     margin-bottom: 20px;
+}
+
+.game-status-display h2 {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 2.5rem;
+    color: #5a3d2b;
+    margin: 0;
+}
+
+.turns-remaining {
+    font-family: 'Georgia', serif;
+    font-size: 1.5rem;
+    color: #e74c3c;
+    margin-top: 10px;
 }
 
 .players-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
 }
 
+/* Player Card Styles */
 .player-card {
-    background: rgba(255,255,255,0.95);
-    padding: 15px;
-    border-radius: 12px;
+    background: #fdfaf1;
+    padding: 20px;
+    border-radius: 15px;
     text-align: center;
-    border: 2px solid #e2e8f0;
+    border: 4px solid #c9a47e;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.2);
     transition: all 0.3s;
+    position: relative;
 }
 
 .player-card.current-player {
-    border-color: #48bb78;
-    background: rgba(72, 187, 120, 0.1);
+    border-color: #e74c3c;
+    transform: translateY(-5px);
+    box-shadow: 0 12px 20px rgba(0,0,0,0.3);
 }
 
 .player-card.eliminated {
-    opacity: 0.5;
-    border-color: #f56565;
-    background: rgba(245, 101, 101, 0.1);
+    opacity: 0.6;
+    background: #e0e0e0;
+    border-color: #8d8d8d;
 }
 
 .player-name {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 1.8rem;
     font-weight: bold;
-    margin-bottom: 8px;
-    color: #2d3748;
+    margin-bottom: 15px;
+    color: #5a3d2b;
 }
 
-.player-stats {
+.player-info {
     display: flex;
-    justify-content: space-between;
-    font-size: 0.9rem;
-    color: #718096;
+    justify-content: space-around;
+    align-items: center;
+    font-size: 1.2rem;
+    color: #5a3d2b;
+}
+
+.card-count {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.card-count span {
+    margin-right: 5px;
+}
+
+.status-icon {
+    font-size: 1.5rem;
+}
+
+.status-icon .status-text {
+    font-size: 1rem;
+    margin-left: 5px;
+    font-family: 'Georgia', serif;
+    font-style: italic;
 }
 
 /* Game Area */
