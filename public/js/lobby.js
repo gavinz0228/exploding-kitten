@@ -136,6 +136,24 @@ class LobbyManager {
         const refreshBtn = document.getElementById('refresh-rooms-btn');
         refreshBtn.addEventListener('click', () => this.refreshRooms());
 
+        // Rules modal
+        const toggleRulesBtn = document.getElementById('toggle-rules-btn');
+        toggleRulesBtn.addEventListener('click', () => this.showRulesModal());
+
+        const closeRulesBtn = document.getElementById('close-rules-btn');
+        closeRulesBtn.addEventListener('click', () => this.hideRulesModal());
+
+        const closeRulesBtnBottom = document.getElementById('close-rules-btn-bottom');
+        closeRulesBtnBottom.addEventListener('click', () => this.hideRulesModal());
+
+        // Close modal on outside click
+        window.addEventListener('click', (event) => {
+            const rulesModal = document.getElementById('rules-modal');
+            if (event.target === rulesModal) {
+                this.hideRulesModal();
+            }
+        });
+
         // Status message close
         const closeStatusBtn = document.getElementById('close-status');
         closeStatusBtn.addEventListener('click', () => this.hideStatus());
@@ -298,22 +316,27 @@ class LobbyManager {
     showNameSetup() {
         document.getElementById('name-setup').classList.remove('hidden');
         document.getElementById('lobby').classList.add('hidden');
-        
-        // Focus on name input
-        setTimeout(() => {
-            document.getElementById('player-name').focus();
-        }, 100);
+        document.getElementById('initial-rules').classList.remove('hidden');
     }
 
     showLobby() {
         document.getElementById('name-setup').classList.add('hidden');
         document.getElementById('lobby').classList.remove('hidden');
-        
+        document.getElementById('initial-rules').classList.add('hidden');
+
         // Update display name
         document.getElementById('display-name').textContent = this.playerName;
-        
+
         // Clear room code input
         document.getElementById('room-code').value = '';
+    }
+
+    showRulesModal() {
+        document.getElementById('rules-modal').classList.remove('hidden');
+    }
+
+    hideRulesModal() {
+        document.getElementById('rules-modal').classList.add('hidden');
     }
 
     isLobbyVisible() {
