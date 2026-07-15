@@ -5,6 +5,7 @@ class LobbyManager {
         this.socket = null;
         this.playerName = '';
         this.playerId = '';
+        this.rulesTrigger = null;
         this.init();
     }
 
@@ -140,6 +141,11 @@ class LobbyManager {
         const toggleRulesBtn = document.getElementById('toggle-rules-btn');
         toggleRulesBtn.addEventListener('click', () => this.showRulesModal());
 
+        const tutorialSource = document.getElementById('initial-rules');
+        const tutorialHost = document.getElementById('modal-tutorial-host');
+        tutorialHost.className = 'tutorial-shell';
+        tutorialHost.innerHTML = tutorialSource.innerHTML;
+
         const closeRulesBtn = document.getElementById('close-rules-btn');
         closeRulesBtn.addEventListener('click', () => this.hideRulesModal());
 
@@ -150,6 +156,13 @@ class LobbyManager {
         window.addEventListener('click', (event) => {
             const rulesModal = document.getElementById('rules-modal');
             if (event.target === rulesModal) {
+                this.hideRulesModal();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            const rulesModal = document.getElementById('rules-modal');
+            if (event.key === 'Escape' && !rulesModal.classList.contains('hidden')) {
                 this.hideRulesModal();
             }
         });
@@ -338,11 +351,20 @@ class LobbyManager {
     }
 
     showRulesModal() {
-        document.getElementById('rules-modal').classList.remove('hidden');
+        const rulesModal = document.getElementById('rules-modal');
+        this.rulesTrigger = document.activeElement;
+        rulesModal.classList.remove('hidden');
+        document.body.classList.add('modal-open');
+        document.getElementById('close-rules-btn').focus();
     }
 
     hideRulesModal() {
         document.getElementById('rules-modal').classList.add('hidden');
+        document.body.classList.remove('modal-open');
+        if (this.rulesTrigger) {
+            this.rulesTrigger.focus();
+            this.rulesTrigger = null;
+        }
     }
 
     isLobbyVisible() {

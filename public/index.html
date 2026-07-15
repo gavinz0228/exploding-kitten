@@ -77,35 +77,63 @@
             </div>
 
             <!-- Initial Game Rules -->
-            <div id="initial-rules" class="game-rules">
-                <h3>How to Play</h3>
-                <div class="rules-content">
-                    <p><strong>Objective:</strong> Avoid drawing an Exploding Kitten card. If you draw one, you explode and are out of the game unless you have a Defuse card to defuse it.</p>
-                    <p><strong>Setup:</strong></p>
-                    <ul>
-                        <li>Each player is dealt a hand of cards.</li>
-                        <li>The deck is shuffled and placed in the center.</li>
-                        <li>Players take turns drawing cards from the deck.</li>
-                    </ul>
-                    <p><strong>Turn Structure:</strong></p>
-                    <ul>
-                        <li>On your turn, you can play as many cards as you like from your hand, or none at all.</li>
-                        <li>After playing cards, you must draw a card from the deck to end your turn.</li>
-                    </ul>
-                    <p><strong>Card Types:</strong></p>
-                    <ul class="card-types-list">
-                        <li><strong>Exploding Kitten:</strong> If drawn, you explode and are out of the game unless you have a Defuse card.</li>
-                        <li><strong>Defuse:</strong> Use to defuse an Exploding Kitten and place it back in the deck.</li>
-                        <li><strong>Nope:</strong> Stop any action except Exploding Kitten or Defuse.</li>
-                        <li><strong>Attack:</strong> End your turn without drawing a card and force the next player to take two turns.</li>
-                        <li><strong>Skip:</strong> End your turn without drawing a card.</li>
-                        <li><strong>Favor:</strong> Force another player to give you a card.</li>
-                        <li><strong>Shuffle:</strong> Shuffle the deck.</li>
-                        <li><strong>See the Future:</strong> Look at the top three cards of the deck.</li>
-                        <li><strong>Cat Cards:</strong> Collect matching pairs to steal a random card from another player.</li>
-                    </ul>
-                    <p><strong>Winning the Game:</strong> The last player remaining who has not exploded wins the game.</p>
+            <div id="initial-rules" class="tutorial-shell">
+                <div class="tutorial-header">
+                    <div>
+                        <span class="section-kicker">The house rules</span>
+                        <h2>Survive the table</h2>
+                        <p>Play tricks, draw carefully, and be the last cat who has not gone boom.</p>
+                    </div>
+                    <span class="tutorial-stamp" aria-hidden="true">Quick<br>guide</span>
                 </div>
+
+                <ol class="turn-path" aria-label="How a turn works">
+                    <li class="turn-step">
+                        <span class="step-number">1</span>
+                        <span class="step-glyph" aria-hidden="true">✦</span>
+                        <h3>Make mischief</h3>
+                        <p>Play any number of cards—or save every trick for later.</p>
+                    </li>
+                    <li class="turn-step">
+                        <span class="step-number">2</span>
+                        <span class="step-glyph" aria-hidden="true">↠</span>
+                        <h3>Draw one card</h3>
+                        <p>Drawing ends your turn. Unless a card says otherwise, you must draw.</p>
+                    </li>
+                    <li class="turn-step">
+                        <span class="step-number">3</span>
+                        <span class="step-glyph danger" aria-hidden="true">☄</span>
+                        <h3>Do not explode</h3>
+                        <p>Draw an Exploding Kitten without a Defuse and you are out.</p>
+                    </li>
+                </ol>
+
+                <div class="survival-note">
+                    <div class="mini-card exploding" aria-hidden="true"><span>☄</span><b>Exploding<br>Kitten</b></div>
+                    <span class="survival-operator" aria-hidden="true">+</span>
+                    <div class="mini-card defuse" aria-hidden="true"><span>✦</span><b>Defuse</b></div>
+                    <div class="survival-copy">
+                        <span class="section-kicker">Your way out</span>
+                        <h3>Defuse the boom</h3>
+                        <p>A Defuse saves you. Secretly return the Exploding Kitten anywhere in the deck and keep playing.</p>
+                    </div>
+                </div>
+
+                <details class="card-reference">
+                    <summary><span>Meet the deck</span><small>Open the full card guide</small></summary>
+                    <div class="card-guide-grid">
+                        <article class="guide-card attack"><span aria-hidden="true">⚡</span><div><h3>Attack</h3><p>End your turn; the next player takes two.</p></div></article>
+                        <article class="guide-card skip"><span aria-hidden="true">↠</span><div><h3>Skip</h3><p>End one turn without drawing.</p></div></article>
+                        <article class="guide-card favor"><span aria-hidden="true">♥</span><div><h3>Favor</h3><p>Choose a player to give you a card.</p></div></article>
+                        <article class="guide-card shuffle"><span aria-hidden="true">⤨</span><div><h3>Shuffle</h3><p>Mix the draw pile without peeking.</p></div></article>
+                        <article class="guide-card future"><span aria-hidden="true">◉</span><div><h3>See the Future</h3><p>Privately view the top three cards.</p></div></article>
+                        <article class="guide-card nope"><span aria-hidden="true">×</span><div><h3>Nope</h3><p>Cancel an action. A Nope can be Noped.</p></div></article>
+                        <article class="guide-card defuse"><span aria-hidden="true">✦</span><div><h3>Defuse</h3><p>Survive an Exploding Kitten.</p></div></article>
+                        <article class="guide-card cats"><span aria-hidden="true">≋</span><div><h3>Cat Pair</h3><p>Play a matching pair to steal at random.</p></div></article>
+                    </div>
+                </details>
+
+                <p class="winning-line"><span aria-hidden="true">♛</span> Last player at the table wins.</p>
             </div>
 
             <!-- Lobby -->
@@ -126,7 +154,7 @@
                 </div>
 
                 <div class="text-center" style="margin-bottom: 20px;">
-                    <button id="toggle-rules-btn" class="secondary-btn rules-btn">📜 Show Rules</button>
+                    <button id="toggle-rules-btn" class="secondary-btn rules-btn">Learn the Game</button>
                 </div>
 
                 <div class="lobby-actions">
@@ -163,40 +191,11 @@
         </main>
 
         <!-- Game Rules Modal -->
-        <div id="rules-modal" class="modal hidden">
-            <div class="modal-content">
-                <button id="close-rules-btn" class="close-btn">&times;</button>
-                <div class="game-rules">
-                    <h3>How to Play</h3>
-                    <div class="rules-content">
-                        <p><strong>Objective:</strong> Avoid drawing an Exploding Kitten card. If you draw one, you explode and are out of the game unless you have a Defuse card to defuse it.</p>
-                        <p><strong>Setup:</strong></p>
-                        <ul>
-                            <li>Each player is dealt a hand of cards.</li>
-                            <li>The deck is shuffled and placed in the center.</li>
-                            <li>Players take turns drawing cards from the deck.</li>
-                        </ul>
-                        <p><strong>Turn Structure:</strong></p>
-                        <ul>
-                            <li>On your turn, you can play as many cards as you like from your hand, or none at all.</li>
-                            <li>After playing cards, you must draw a card from the deck to end your turn.</li>
-                        </ul>
-                        <p><strong>Card Types:</strong></p>
-                        <ul class="card-types-list">
-                                <li><strong>Exploding Kitten:</strong> If drawn, you explode and are out of the game unless you have a Defuse card.</li>
-                                <li><strong>Defuse:</strong> Use to defuse an Exploding Kitten and place it back in the deck.</li>
-                                <li><strong>Nope:</strong> Stop any action except Exploding Kitten or Defuse.</li>
-                                <li><strong>Attack:</strong> End your turn without drawing a card and force the next player to take two turns.</li>
-                                <li><strong>Skip:</strong> End your turn without drawing a card.</li>
-                                <li><strong>Favor:</strong> Force another player to give you a card.</li>
-                                <li><strong>Shuffle:</strong> Shuffle the deck.</li>
-                                <li><strong>See the Future:</strong> Look at the top three cards of the deck.</li>
-                                <li><strong>Cat Cards:</strong> Collect matching pairs to steal a random card from another player.</li>
-                            </ul>
-                        <p><strong>Winning the Game:</strong> The last player remaining who has not exploded wins the game.</p>
-                    </div>
-                </div>
-                <div class="modal-footer text-center" style="margin-top: 20px;">
+        <div id="rules-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="How to play">
+            <div class="modal-content tutorial-modal-content">
+                <button id="close-rules-btn" class="close-btn" aria-label="Close tutorial">&times;</button>
+                <div id="modal-tutorial-host"></div>
+                <div class="modal-footer text-center">
                     <button id="close-rules-btn-bottom" class="secondary-btn">Close</button>
                 </div>
             </div>
