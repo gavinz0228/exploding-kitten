@@ -149,6 +149,12 @@ class GameManager {
             }
         });
 
+        this.socket.on('game-state', (data) => {
+            if (data.gameState) {
+                this.updateGameState(data.gameState);
+            }
+        });
+
         
 
         
@@ -168,6 +174,12 @@ class GameManager {
             console.log(`Socket error: ${data.message}`);
             this.showStatus(data.message, 'error');
             this.hideLoading();
+
+            // A rejected action can mean this tab missed a newer broadcast.
+            // Immediately refresh from the server so controls cannot remain stale.
+            if (data.message === 'Not your turn' || data.message.includes('current action')) {
+                this.socket.emit('get-game-state');
+            }
             
             // If it's a room not found error, redirect to lobby after a delay
             if (data.message.includes('Room not found')) {
@@ -285,6 +297,9 @@ class GameManager {
 
     updateGameStatus() {
         const statusDisplay = document.getElementById('game-status-display');
+        const currentPlayerDisplay = document.getElementById('current-player');
+        const turnsRemainingDisplay = document.getElementById('turns-remaining');
+        const turnsCountDisplay = document.getElementById('turns-count');
         const turnsElement = document.createElement('div');
         turnsElement.className = 'turns-remaining';
 
@@ -293,9 +308,11 @@ class GameManager {
         switch (this.gameState.gameState) {
             case 'waiting':
                 statusHTML = `<h2>Waiting for players...</h2>`;
+                currentPlayerDisplay.textContent = 'Waiting…';
                 break;
             case 'playing':
                 statusHTML = `<h2>${this.gameState.currentPlayer}'s turn</h2>`;
+                currentPlayerDisplay.textContent = this.gameState.currentPlayer;
                 if (this.gameState.turnsRemaining > 1) {
                     turnsElement.innerHTML = `<span>Turns remaining: ${this.gameState.turnsRemaining}</span>`;
                     statusHTML += turnsElement.outerHTML;
@@ -303,9 +320,16 @@ class GameManager {
                 break;
             case 'finished':
                 statusHTML = `<h2>Winner: ${this.gameState.winner}</h2>`;
+                currentPlayerDisplay.textContent = `${this.gameState.winner} wins!`;
                 this.showGameOver();
                 break;
         }
+
+        turnsCountDisplay.textContent = this.gameState.turnsRemaining;
+        turnsRemainingDisplay.classList.toggle(
+            'hidden',
+            this.gameState.gameState !== 'playing' || this.gameState.turnsRemaining <= 1
+        );
         statusDisplay.innerHTML = statusHTML;
     }
 
@@ -400,15 +424,16 @@ class GameManager {
             playBtn.textContent = 'Play Selected Cards';
         } else if (this.gameState.gameState === 'playing') {
             startBtn.classList.add('hidden');
-            drawBtn.disabled = !this.gameState.isMyTurn || !!this.gameState.pendingAction;
+            const actionIsResolving = !!this.gameState.pendingAction || !!this.gameState.nopeWindow;
+            drawBtn.disabled = !this.gameState.isMyTurn || actionIsResolving;
             
             // Always update play button based on current state
             if (!this.gameState.isMyTurn) {
                 playBtn.disabled = true;
                 playBtn.textContent = 'Not your turn';
-            } else if (!!this.gameState.pendingAction) {
+            } else if (actionIsResolving) {
                 playBtn.disabled = true;
-                playBtn.textContent = 'Waiting for action...';
+                playBtn.textContent = 'Action resolving…';
             } else {
                 // Update play button based on current selection
                 this.updatePlayButton();
@@ -989,6 +1014,11 @@ class GameManager {
     drawCard() {
         if (!this.gameState.isMyTurn) {
             this.showStatus('Not your turn', 'error');
+            return;
+        }
+
+        if (this.gameState.pendingAction || this.gameState.nopeWindow) {
+            this.showStatus('Waiting for the current action to resolve', 'warning');
             return;
         }
 

@@ -331,7 +331,7 @@ io.on('connection', (socket) => {
     }
 
     const playerRoom = roomManager.getPlayerRoom(socket.playerId);
-    if (playerRoom) {
+    if (playerRoom?.game) {
       socket.emit('game-state', {
         gameState: playerRoom.game
       });

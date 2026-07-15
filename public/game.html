@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Exploding Kittens - Game Room</title>
     <meta name="description" content="You are in an Exploding Kittens game room. Play cards, draw from the deck, and try to be the last one standing!">
+    <link rel="icon" href="/images/cat-cardmaster.webp" type="image/webp">
     <link rel="stylesheet" href="/css/styles.css">
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8539131517427924" crossorigin="anonymous"></script>
 
@@ -14,67 +15,87 @@
         <!-- Game Header -->
         <header class="game-header">
             <div class="room-info">
-                <img src="/images/profile-picture.png" alt="Profile Picture" class="profile-picture">
-                <h1>Room: <span id="room-id"></span></h1>
-            </div>
-            <div class="deck-info">
-                <div class="deck-count">
-                    <div class="deck-icon">🎴</div>
-                    <span id="deck-size">0</span>
-                </div>
-                <div class="discard-pile" id="discard-pile">
-                    <div class="card-back">Discard</div>
+                <img src="/images/cat-cardmaster.webp" alt="The cat cardmaster" class="profile-picture">
+                <div>
+                    <span class="eyebrow">Private cardroom</span>
+                    <h1>Room <span id="room-id"></span></h1>
                 </div>
             </div>
+            <a class="lobby-link" href="/">Leave table</a>
         </header>
 
-        <!-- Combined Status Area -->
-        <div id="status-area" class="status-area">
-            <div id="game-status-display" class="game-status-display"></div>
-            <div id="players-list" class="players-grid"></div>
-        </div>
+        <main class="tabletop-layout">
+            <div class="tabletop-main">
+                <!-- Combined Status Area -->
+                <div id="status-area" class="status-area">
+                    <div id="game-status-display" class="game-status-display"></div>
+                    <div id="players-list" class="players-grid"></div>
+                </div>
 
-        <!-- Game Area -->
-        <div class="game-area">
-            <!-- Current Turn Info -->
-            <div class="turn-info">
-                <div id="current-turn" class="current-turn">
-                    <span id="current-player">Waiting...</span>
-                    <div id="turns-remaining" class="turns-remaining hidden">
-                        Turns remaining: <span id="turns-count">1</span>
+                <!-- Game Area -->
+                <div class="game-area">
+                    <div class="table-center">
+                        <div class="deck-info" aria-label="Draw and discard piles">
+                            <div class="draw-pile" aria-hidden="true">
+                                <span class="deck-cat-mark">✦</span>
+                                <span>Draw</span>
+                            </div>
+                            <div class="deck-count" aria-label="Cards remaining">
+                                <span id="deck-size">0</span>
+                                <small>cards left</small>
+                            </div>
+                            <div class="discard-pile" id="discard-pile">
+                                <div class="card-back">Discard</div>
+                            </div>
+                        </div>
+
+                        <!-- Current Turn Info -->
+                        <div class="turn-info">
+                            <span class="section-kicker">Current turn</span>
+                            <div id="current-turn" class="current-turn">
+                                <span id="current-player">Waiting...</span>
+                                <div id="turns-remaining" class="turns-remaining hidden">
+                                    Turns remaining: <span id="turns-count">1</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="action-buttons">
+                            <button id="draw-card-btn" class="action-btn primary-btn" disabled>
+                                Draw a Card
+                            </button>
+                            <button id="play-cards-btn" class="action-btn secondary-btn" disabled>
+                                Play Selected Cards
+                            </button>
+                            <button id="start-game-btn" class="action-btn secondary-btn hidden">
+                                Start Game
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Player Hand -->
+                    <div class="player-hand-area">
+                        <div class="hand-heading">
+                            <span class="section-kicker">Your hand</span>
+                            <h3>Choose your mischief</h3>
+                        </div>
+                        <div id="player-hand" class="player-hand">
+                            <!-- Player's cards will be displayed here -->
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="action-buttons">
-                <button id="draw-card-btn" class="action-btn primary-btn" disabled>
-                    Draw Card
-                </button>
-                <button id="play-cards-btn" class="action-btn secondary-btn" disabled>
-                    Play Selected Cards
-                </button>
-                <button id="start-game-btn" class="action-btn secondary-btn hidden">
-                    Start Game
-                </button>
-            </div>
-
-            <!-- Player Hand -->
-            <div class="player-hand-area">
-                <h3>Your Hand</h3>
-                <div id="player-hand" class="player-hand">
-                    <!-- Player's cards will be displayed here -->
+            <!-- Game Log -->
+            <aside class="game-log">
+                <span class="section-kicker">Table talk</span>
+                <h4>Game Log</h4>
+                <div id="log-messages" class="log-messages">
+                    <!-- Game messages will appear here -->
                 </div>
-            </div>
-        </div>
-
-        <!-- Game Log -->
-        <div class="game-log">
-            <h4>Game Log</h4>
-            <div id="log-messages" class="log-messages">
-                <!-- Game messages will appear here -->
-            </div>
-        </div>
+            </aside>
+        </main>
 
         <!-- Modals -->
         

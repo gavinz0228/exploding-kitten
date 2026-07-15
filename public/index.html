@@ -6,20 +6,26 @@
     <title>Exploding Kittens - Online Multiplayer Card Game</title>
     <meta name="description" content="Play the Exploding Kittens card game online with friends. A real-time multiplayer game of strategy, luck, and adorable explosions. Avoid the Exploding Kitten to win!">
     <meta name="keywords" content="exploding kittens, card game, multiplayer, online game, strategy game, party game">
+    <link rel="icon" href="/images/cat-cardmaster.webp" type="image/webp">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://ek.chord.cafe">
     <meta property="og:title" content="Exploding Kittens - Online Multiplayer Card Game">
     <meta property="og:description" content="Play the Exploding Kittens card game online with friends. A real-time multiplayer game of strategy, luck, and adorable explosions. Avoid the Exploding Kitten to win!">
-    <meta property="og:image" content="https://ek.chord.cafe/images/og-image.png">
+    <meta property="og:image" content="https://ek.chord.cafe/images/og-cardmaster.webp">
+    <meta property="og:image:type" content="image/webp">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="632">
+    <meta property="og:image:alt" content="Exploding Kittens — outwit your friends and dodge the boom">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://ek.chord.cafe">
     <meta property="twitter:title" content="Exploding Kittens - Online Multiplayer Card Game">
     <meta property="twitter:description" content="Play the Exploding Kittens card game online with friends. A real-time multiplayer game of strategy, luck, and adorable explosions. Avoid the Exploding Kitten to win!">
-    <meta property="twitter:image" content="https://ek.chord.cafe/images/og-image.png">
+    <meta property="twitter:image" content="https://ek.chord.cafe/images/og-cardmaster.webp">
+    <meta property="twitter:image:alt" content="Exploding Kittens — outwit your friends and dodge the boom">
     
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8539131517427924" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="css/styles.css">
@@ -50,16 +56,20 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <img src="/images/profile-picture.png" alt="Profile Picture" class="profile-picture">
-            <h1>Exploding Kittens</h1>
-            <p>Multiplayer Card Game</p>
+        <header class="brand-header">
+            <img src="/images/cat-cardmaster.webp" alt="A mischievous cat cardmaster" class="profile-picture">
+            <div class="brand-copy">
+                <span class="eyebrow">A suspiciously lively card game</span>
+                <h1>Exploding Kittens</h1>
+                <p>Outwit your friends. Dodge the boom.</p>
+            </div>
         </header>
 
         <main>
             <!-- Player Name Setup -->
             <div id="name-setup" class="section">
-                <h2>Enter Your Name</h2>
+                <span class="section-kicker">Take a seat</span>
+                <h2>What should we call you?</h2>
                 <div class="input-group">
                     <input type="text" id="player-name" placeholder="Your name" maxlength="20">
                     <button id="set-name-btn" class="secondary-btn">Join Lobby</button>
@@ -108,8 +118,11 @@
                         <button id="change-name-btn" class="normal-btn">Change Name</button>
                     </div>
                 </div>
-                <div class="player-info">
-                    <h2>Welcome, <span id="display-name"></span>!</h2>
+                <div class="player-info lobby-welcome">
+                    <div>
+                        <span class="section-kicker">The cardroom is open</span>
+                        <h2>Welcome, <span id="display-name"></span>!</h2>
+                    </div>
                 </div>
 
                 <div class="text-center" style="margin-bottom: 20px;">
@@ -134,11 +147,16 @@
                 </div>
 
                 <div class="available-rooms">
-                    <h3>Available Rooms</h3>
+                    <div class="room-list-heading">
+                        <div>
+                            <span class="section-kicker">Open tables</span>
+                            <h3>Available Rooms</h3>
+                        </div>
+                        <button id="refresh-rooms-btn" class="secondary-btn compact-btn">Refresh</button>
+                    </div>
                     <div id="rooms-list">
                         <p class="no-rooms">No rooms available. Create one to get started!</p>
                     </div>
-                    <button id="refresh-rooms-btn" class="secondary-btn">Refresh</button>
                 </div>
 
             </div>

@@ -188,7 +188,8 @@ class Game {
       logger.debug('nope_play_allowed', { roomId: this.roomId, playerId });
       // Allow to play Nope during the nope window, regardless of turn or pending action
     } else {
-      // For all other cards, enforce current player and no pending action
+      // For all other cards, enforce current player and wait for any Nope
+      // response window to resolve before accepting another action.
       if (this.getCurrentPlayer().id !== playerId) {
         logger.warn('card_play_rejected', {
           roomId: this.roomId,
@@ -197,6 +198,14 @@ class Game {
           reason: 'not_players_turn'
         });
         return { success: false, message: 'Not your turn' };
+      }
+      if (this.nopeWindow) {
+        logger.warn('card_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          reason: 'nope_window_open'
+        });
+        return { success: false, message: 'Waiting for the current action to resolve' };
       }
       if (this.pendingAction) {
         logger.warn('card_play_rejected', {
@@ -214,7 +223,7 @@ class Game {
     if (result.success) {
       // For cat cards, the card removal is handled inside handleCatCard
       // For other cards, remove the card here
-      if (!card.isCat) {
+      if (!card.isCat && card.type !== 'nope') {
         player.hand.splice(cardIndex, 1);
         this.deck.discard(card);
       }
@@ -266,38 +275,7 @@ class Game {
     // (Assume that if the first card in cardIds is a Nope, this is a Nope play)
     const firstCard = player.hand.find(c => c.id === cardIds[0]);
     if (firstCard && firstCard.type === 'nope') {
-      if (!this.nopeWindow) {
-        logger.warn('nope_play_rejected', {
-          roomId: this.roomId,
-          playerId,
-          cardId: cardIds[0],
-          reason: 'no_nope_window'
-        });
-        return { success: false, message: 'Server:playMultipleCards Nope can only be played in response to other cards' };
-      }
-      if (this.nopeWindow.excludePlayerId === playerId) {
-        logger.warn('nope_play_rejected', {
-          roomId: this.roomId,
-          playerId,
-          reason: 'own_action'
-        });
-        return { success: false, message: 'You cannot nope your own action' };
-      }
-      // Allow to play Nope during the nope window, regardless of turn or pending action
-      // Remove the Nope card from hand and discard it
-      const nopeIndex = player.hand.findIndex(card => card.id === cardIds[0]);
-      if (nopeIndex === -1) {
-        logger.warn('nope_play_rejected', {
-          roomId: this.roomId,
-          playerId,
-          reason: 'card_not_found'
-        });
-        return { success: false, message: 'Nope card not found in hand' };
-      }
-      const nopeCard = player.hand.splice(nopeIndex, 1)[0];
-      this.deck.discard(nopeCard);
-      logger.debug('nope_play_allowed', { roomId: this.roomId, playerId });
-      return this.playNopeCard(player);
+      return { success: false, message: 'Nope must be played by itself' };
     }
 
     if (this.getCurrentPlayer().id !== playerId) {
@@ -308,6 +286,10 @@ class Game {
         reason: 'not_players_turn'
       });
       return { success: false, message: 'Not your turn' };
+    }
+
+    if (this.nopeWindow) {
+      return { success: false, message: 'Waiting for the current action to resolve' };
     }
 
     // Validate that all cards exist in player's hand
@@ -455,9 +437,6 @@ class Game {
         // Create nope window for skip action
         this.createNopeWindow('Skip', player.id, () => {
           this.endTurn();
-          if (typeof this.broadcastCallback === 'function') {
-            this.broadcastCallback({ type: 'favor-attempt', message: `${player.name} is attempting to play Favor on ${targetPlayer.name}` });
-          }
         });
         return { 
           success: true, 
@@ -790,6 +769,10 @@ class Game {
       return { success: false, message: 'Not your turn' };
     }
 
+    if (this.nopeWindow) {
+      return { success: false, message: 'Waiting for the current action to resolve' };
+    }
+
     const drawnCard = this.deck.drawCard();
     if (!drawnCard) {
       return { success: false, message: 'No cards left in deck' };
@@ -999,18 +982,9 @@ class Game {
       clearTimeout(this.nopeWindow.timeout);
     }
     
-    this.nopeWindow.timeout = setTimeout(() => {
-      // Execute or cancel based on final nope count
-      if (this.nopeWindow && this.nopeWindow.executeAction) {
-        // Even number of nopes = action executes, odd number = action cancelled
-        if (this.nopeWindow.nopeCount % 2 === 0) {
-          this.nopeWindow.executeAction();
-          this.addToLog(`${this.nopeWindow.action} resolved (${this.nopeWindow.nopeCount} nopes played)`);
-        } else {
-          this.addToLog(`${this.nopeWindow.action} was noped and cancelled (${this.nopeWindow.nopeCount} nopes played)`);
-        }
-      }
-      this.nopeWindow = null;
+    const activeWindow = this.nopeWindow;
+    activeWindow.timeout = setTimeout(() => {
+      this.resolveNopeWindow(activeWindow);
     }, 5000); // Shorter timeout for nope chains
 
     const isYup = this.nopeWindow.nopeCount % 2 === 0;
@@ -1050,30 +1024,17 @@ class Game {
     });
 
     // Create a window for players to play nope cards
-    this.nopeWindow = {
+    const nopeWindow = {
       action: action,
       excludePlayerId: excludePlayerId,
       executeAction: executeAction,
       nopeCount: 0, // Track number of nopes played (for nope chains)
-      timeout: setTimeout(() => {
-        logger.info('nope_window_closing', { roomId: this.roomId, action });
-        // If no one nopes within 10 seconds, execute the action
-        if (this.nopeWindow && this.nopeWindow.executeAction) {
-          // Check if action should execute (even number of nopes = action executes)
-          if (this.nopeWindow.nopeCount % 2 === 0) {
-            this.nopeWindow.executeAction();
-            this.addToLog(`${action} resolved`);
-          } else {
-            this.addToLog(`${action} was noped and cancelled`);
-          }
-          // Broadcast new state after action is resolved or noped
-          if (typeof this.broadcastCallback === 'function') {
-            this.broadcastCallback({ type: action.toLowerCase() + '-resolved', gameState: this.getGameState() });
-          }
-        }
-        this.nopeWindow = null;
-      }, 10000) // 10 seconds for easier testing
+      timeout: null
     };
+    nopeWindow.timeout = setTimeout(() => {
+      this.resolveNopeWindow(nopeWindow);
+    }, 10000); // 10 seconds for easier testing
+    this.nopeWindow = nopeWindow;
 
     // Broadcast the updated game state to all players immediately after setting the nope window
     if (typeof this.broadcastCallback === 'function') {
@@ -1082,6 +1043,62 @@ class Game {
     }
 
     return this.nopeWindow;
+  }
+
+  resolveNopeWindow(nopeWindow) {
+    if (!nopeWindow || this.nopeWindow !== nopeWindow) return false;
+
+    logger.info('nope_window_closing', {
+      roomId: this.roomId,
+      action: nopeWindow.action,
+      nopeCount: nopeWindow.nopeCount
+    });
+
+    if (nopeWindow.timeout) {
+      clearTimeout(nopeWindow.timeout);
+    }
+
+    // Close the response window before executing or broadcasting so every
+    // client receives an authoritative state that permits the next action.
+    this.nopeWindow = null;
+    const actionExecutes = nopeWindow.nopeCount % 2 === 0;
+
+    try {
+      if (actionExecutes && typeof nopeWindow.executeAction === 'function') {
+        nopeWindow.executeAction();
+      }
+
+      const suffix = nopeWindow.nopeCount > 0
+        ? ` (${nopeWindow.nopeCount} nopes played)`
+        : '';
+      this.addToLog(
+        actionExecutes
+          ? `${nopeWindow.action} resolved${suffix}`
+          : `${nopeWindow.action} was noped and cancelled${suffix}`
+      );
+    } catch (error) {
+      logger.error('nope_window_resolution_failed', {
+        roomId: this.roomId,
+        action: nopeWindow.action,
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        }
+      });
+    }
+
+    if (typeof this.broadcastCallback === 'function') {
+      const eventName = nopeWindow.action.toLowerCase().replace(/\s+/g, '-');
+      this.broadcastCallback({
+        type: `${eventName}-resolved`,
+        message: actionExecutes
+          ? `${nopeWindow.action} resolved`
+          : `${nopeWindow.action} was cancelled`
+      });
+    }
+
+    return true;
   }
 
   canPlayNope(playerId) {

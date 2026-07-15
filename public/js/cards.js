@@ -3,19 +3,19 @@
 class CardRenderer {
     static getCardIcon(cardType) {
         const icons = {
-            'attack': '⚔️',
-            'skip': '⏭️',
-            'favor': '🤝',
-            'shuffle': '🔀',
-            'see_future': '🔮',
-            'nope': '🚫',
-            'defuse': '🛡️',
-            'exploding_kitten': '💥',
-            'tacocat': '🌮',
-            'rainbow_cat': '🌈',
-            'potato_cat': '🥔',
-            'beard_cat': '🧔',
-            'cattermelon': '🍉'
+            'attack': '⚡',
+            'skip': '↠',
+            'favor': '♥',
+            'shuffle': '⤨',
+            'see_future': '◉',
+            'nope': '×',
+            'defuse': '✦',
+            'exploding_kitten': '☄',
+            'tacocat': '◒',
+            'rainbow_cat': '⌁',
+            'potato_cat': '●',
+            'beard_cat': '≋',
+            'cattermelon': '◉'
         };
         return icons[cardType] || '🃏';
     }
@@ -138,6 +138,10 @@ class CardRenderer {
                 return { canPlay: false, reason: "Defuse can only be used when drawing an Exploding Kitten" };
             
             default:
+                if (gameState.nopeWindow) {
+                    return { canPlay: false, reason: "Waiting for the current action to resolve" };
+                }
+
                 // For other cards, check if it's the player's turn
                 if (!gameState.isMyTurn) {
                     return { canPlay: false, reason: "Not your turn" };
