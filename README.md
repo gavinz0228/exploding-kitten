@@ -200,6 +200,16 @@ For development with auto-restart:
 npm run dev
 ```
 
+### Backend Logs
+
+The backend writes structured JSON logs to `logs/combined.log`. Error-level
+entries are also written to `logs/error.log`. Log files rotate at 10 MB, with
+up to five files retained for each output.
+
+Set `LOG_DIR` to change the output directory and `LOG_LEVEL` to control the
+minimum level (for example, `debug`, `info`, `warn`, or `error`). Backend logs
+are also printed to the console unless `NODE_ENV=test`.
+
 ## Contributing
 
 Feel free to submit issues and enhancement requests!

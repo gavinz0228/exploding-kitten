@@ -1,4 +1,5 @@
 const CardDeck = require('./cardDeck');
+const logger = require('./logger');
 
 class Game {
   constructor(roomId) {
@@ -116,44 +117,82 @@ class Game {
   playCard(playerId, cardId, targetPlayerId = null, additionalData = null) {
     const player = this.getPlayer(playerId);
     if (!player || !player.isAlive) {
-      console.log(`[playCard] Player not found or eliminated: ${playerId}`);
+      logger.warn('card_play_rejected', {
+        roomId: this.roomId,
+        playerId,
+        reason: 'player_not_found_or_eliminated'
+      });
       return { success: false, message: 'Player not found or eliminated' };
     }
     if (this.gameState !== 'playing') {
-      console.log(`[playCard] Game not in progress`);
+      logger.warn('card_play_rejected', {
+        roomId: this.roomId,
+        playerId,
+        reason: 'game_not_in_progress'
+      });
       return { success: false, message: 'Game not in progress' };
     }
     
     const cardIndex = player.hand.findIndex(card => card.id === cardId);
     if (cardIndex === -1) {
-      console.log(`[playCard] Card not found in hand: ${cardId}`);
+      logger.warn('card_play_rejected', {
+        roomId: this.roomId,
+        playerId,
+        cardId,
+        reason: 'card_not_found'
+      });
       return { success: false, message: 'Card not found in hand' };
     }
     const card = player.hand[cardIndex];
-    console.log(`[playCard] ${player.name} is playing ${card.type} card${targetPlayerId ? ` on ${this.getPlayer(targetPlayerId).name}` : ''}`);
-
-    console.log(`[playCard] cardType=${card.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
+    logger.info('card_play_attempt', {
+      roomId: this.roomId,
+      playerId,
+      cardId,
+      cardType: card.type,
+      targetPlayerId,
+      currentPlayerId: this.getCurrentPlayer()?.id,
+      nopeWindowOpen: Boolean(this.nopeWindow),
+      pendingActionOpen: Boolean(this.pendingAction)
+    });
 
     // Special case: allow any eligible player to play Nope during a nope window, regardless of turn or pending action
     if (card.type === 'nope') {
       if (!this.nopeWindow) {
-        console.log(`[playCard] Nope can only be played in response to other cards: playerId=${playerId}, cardId=${cardId}, cardType=${card.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
+        logger.warn('nope_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          cardId,
+          reason: 'no_nope_window'
+        });
         return { success: false, message: 'Server:playCard Nope can only be played in response to other cards' };
       }
       if (this.nopeWindow.excludePlayerId === playerId) {
-        console.log(`[playCard] Player tried to nope their own action`);
+        logger.warn('nope_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          reason: 'own_action'
+        });
         return { success: false, message: 'You cannot nope your own action' };
       }
-      console.log(`[playCard] Allowing Nope during nope window`);
+      logger.debug('nope_play_allowed', { roomId: this.roomId, playerId });
       // Allow to play Nope during the nope window, regardless of turn or pending action
     } else {
       // For all other cards, enforce current player and no pending action
       if (this.getCurrentPlayer().id !== playerId) {
-        console.log(`[playCard] Not your turn: playerId=${playerId}, currentPlayerId=${this.getCurrentPlayer().id}`);
+        logger.warn('card_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          currentPlayerId: this.getCurrentPlayer()?.id,
+          reason: 'not_players_turn'
+        });
         return { success: false, message: 'Not your turn' };
       }
       if (this.pendingAction) {
-        console.log(`[playCard] Waiting for response to previous action`);
+        logger.warn('card_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          reason: 'pending_action'
+        });
         return { success: false, message: 'Waiting for response to previous action' };
       }
     }
@@ -176,15 +215,30 @@ class Game {
   }
 
   playMultipleCards(playerId, cardIds, primaryCardId, targetPlayerId = null, additionalData = null) {
-    console.log(`[playMultipleCards] playerId=${playerId}, cardIds=${JSON.stringify(cardIds)}, primaryCardId=${primaryCardId}, targetPlayerId=${targetPlayerId}, additionalData=${JSON.stringify(additionalData)}`);
+    logger.info('multiple_card_play_attempt', {
+      roomId: this.roomId,
+      playerId,
+      cardIds,
+      primaryCardId,
+      targetPlayerId,
+      additionalData
+    });
     if (this.gameState !== 'playing') {
-      console.log(`[playMultipleCards] Game not in progress`);
+      logger.warn('multiple_card_play_rejected', {
+        roomId: this.roomId,
+        playerId,
+        reason: 'game_not_in_progress'
+      });
       return { success: false, message: 'Game not in progress' };
     }
 
     const player = this.getPlayer(playerId);
     if (!player || !player.isAlive) {
-      console.log(`[playMultipleCards] Player not found or eliminated: ${playerId}`);
+      logger.warn('multiple_card_play_rejected', {
+        roomId: this.roomId,
+        playerId,
+        reason: 'player_not_found_or_eliminated'
+      });
       return { success: false, message: 'Player not found or eliminated' };
     }
 
@@ -192,7 +246,7 @@ class Game {
     if (cardIds.length === 1) {
       const singleCard = player.hand.find(c => c.id === cardIds[0]);
       if (singleCard && singleCard.type === 'nope') {
-        console.log(`[playMultipleCards] Single Nope card detected, delegating to playCard`);
+        logger.debug('single_nope_delegated', { roomId: this.roomId, playerId });
         return this.playCard(playerId, cardIds[0], targetPlayerId, additionalData);
       }
     }
@@ -202,28 +256,46 @@ class Game {
     const firstCard = player.hand.find(c => c.id === cardIds[0]);
     if (firstCard && firstCard.type === 'nope') {
       if (!this.nopeWindow) {
-        console.log(`[playMultipleCards] Nope can only be played in response to other cards: playerId=${playerId}, cardId=${cardIds[0]}, cardType=${firstCard.type}, currentPlayerId=${this.getCurrentPlayer().id}, nopeWindow=${!!this.nopeWindow}, pendingAction=${!!this.pendingAction}`);
+        logger.warn('nope_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          cardId: cardIds[0],
+          reason: 'no_nope_window'
+        });
         return { success: false, message: 'Server:playMultipleCards Nope can only be played in response to other cards' };
       }
       if (this.nopeWindow.excludePlayerId === playerId) {
-        console.log(`[playMultipleCards] Player tried to nope their own action`);
+        logger.warn('nope_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          reason: 'own_action'
+        });
         return { success: false, message: 'You cannot nope your own action' };
       }
       // Allow to play Nope during the nope window, regardless of turn or pending action
       // Remove the Nope card from hand and discard it
       const nopeIndex = player.hand.findIndex(card => card.id === cardIds[0]);
       if (nopeIndex === -1) {
-        console.log(`[playMultipleCards] Nope card not found in hand`);
+        logger.warn('nope_play_rejected', {
+          roomId: this.roomId,
+          playerId,
+          reason: 'card_not_found'
+        });
         return { success: false, message: 'Nope card not found in hand' };
       }
       const nopeCard = player.hand.splice(nopeIndex, 1)[0];
       this.deck.discard(nopeCard);
-      console.log(`[playMultipleCards] Allowing Nope during nope window`);
+      logger.debug('nope_play_allowed', { roomId: this.roomId, playerId });
       return this.playNopeCard(player);
     }
 
     if (this.getCurrentPlayer().id !== playerId) {
-      console.log(`[playMultipleCards] Not your turn: playerId=${playerId}, currentPlayerId=${this.getCurrentPlayer().id}`);
+      logger.warn('multiple_card_play_rejected', {
+        roomId: this.roomId,
+        playerId,
+        currentPlayerId: this.getCurrentPlayer()?.id,
+        reason: 'not_players_turn'
+      });
       return { success: false, message: 'Not your turn' };
     }
 
@@ -449,7 +521,11 @@ class Game {
 
       case 'nope':
         if (!this.nopeWindow) {
-          console.log("Nope played when no nope window is open");
+          logger.warn('nope_play_rejected', {
+            roomId: this.roomId,
+            playerId: player.id,
+            reason: 'no_nope_window'
+          });
           return { success: false, message: 'Server: Nope can only be played in response to other cards' };
         }
         return this.playNopeCard(player);
@@ -956,7 +1032,11 @@ class Game {
       clearTimeout(this.nopeWindow.timeout);
     }
 
-    console.log(`[createNopeWindow] Opening nope window for action=${action}, excludePlayerId=${excludePlayerId}`);
+    logger.info('nope_window_opened', {
+      roomId: this.roomId,
+      action,
+      excludePlayerId
+    });
 
     // Create a window for players to play nope cards
     this.nopeWindow = {
@@ -965,7 +1045,7 @@ class Game {
       executeAction: executeAction,
       nopeCount: 0, // Track number of nopes played (for nope chains)
       timeout: setTimeout(() => {
-        console.log(`[createNopeWindow] Nope window closing for action=${action}`);
+        logger.info('nope_window_closing', { roomId: this.roomId, action });
         // If no one nopes within 10 seconds, execute the action
         if (this.nopeWindow && this.nopeWindow.executeAction) {
           // Check if action should execute (even number of nopes = action executes)
@@ -986,7 +1066,7 @@ class Game {
 
     // Broadcast the updated game state to all players immediately after setting the nope window
     if (typeof this.broadcastCallback === 'function') {
-      console.log(`[createNopeWindow] Broadcasting game state with nope window open for action=${action}`);
+      logger.debug('nope_window_broadcast', { roomId: this.roomId, action });
       this.broadcastCallback({ type: 'nope-window-opened', message: `${action} can be noped now`, gameState: this.getGameState() });
     }
 
@@ -1006,6 +1086,11 @@ class Game {
   addToLog(message) {
     this.gameLog.push({
       timestamp: Date.now(),
+      message
+    });
+
+    logger.info('game_event', {
+      roomId: this.roomId,
       message
     });
     

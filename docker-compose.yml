@@ -10,6 +10,8 @@ services:
     restart: always
     environment:
       NODE_ENV: production
+      LOG_DIR: /app/logs
     volumes:
       - .:/usr/src/app
+      - ./logs:/app/logs
     command: npm start

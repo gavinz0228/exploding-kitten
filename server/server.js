@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const RoomManager = require('./roomManager');
+const logger = require('./logger');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +16,37 @@ const io = socketIo(server, {
 });
 
 const roomManager = new RoomManager(io);
+
+function serializeError(error) {
+  if (!(error instanceof Error)) return error;
+
+  return {
+    name: error.name,
+    message: error.message,
+    stack: error.stack
+  };
+}
+
+// Record every HTTP request with a correlation ID and completion details.
+app.use((req, res, next) => {
+  const requestId = req.headers['x-request-id'] || uuidv4();
+  const startedAt = process.hrtime.bigint();
+
+  res.set('X-Request-Id', requestId);
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    logger.info('http_request_completed', {
+      requestId,
+      method: req.method,
+      path: req.originalUrl,
+      statusCode: res.statusCode,
+      durationMs: Number(durationMs.toFixed(2)),
+      ip: req.ip
+    });
+  });
+
+  next();
+});
 
 // API Routes (must come before static files)
 app.get('/api/rooms', (req, res) => {
@@ -48,7 +80,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
+  logger.info('socket_connected', { socketId: socket.id });
 
   // Store player info
   socket.playerName = null;
@@ -63,11 +95,19 @@ io.on('connection', (socket) => {
     if (data.playerId && data.playerId !== socket.id) {
       // Client provided a persistent player ID (reconnection case)
       socket.playerId = data.playerId;
-      console.log(`Player reconnecting: ${socket.playerName} (${socket.playerId})`);
+      logger.info('player_reconnecting', {
+        playerName: socket.playerName,
+        playerId: socket.playerId,
+        socketId: socket.id
+      });
     } else {
       // Generate new persistent player ID
       socket.playerId = uuidv4();
-      console.log(`New player joined: ${socket.playerName} (${socket.playerId})`);
+      logger.info('player_joined_lobby', {
+        playerName: socket.playerName,
+        playerId: socket.playerId,
+        socketId: socket.id
+      });
     }
     
     socket.emit('lobby-joined', {
@@ -84,14 +124,20 @@ io.on('connection', (socket) => {
       return;
     }
 
-    console.log(`Creating room for player: ${socket.playerName} (${socket.playerId})`);
+    logger.info('room_create_attempt', {
+      playerName: socket.playerName,
+      playerId: socket.playerId
+    });
     const result = roomManager.createRoom(socket.playerId, socket.playerName, socket.id);
     
     if (result.success) {
       socket.roomId = result.roomId;
       socket.join(result.roomId);
       
-      console.log(`Room created successfully: ${result.roomId}`);
+      logger.info('room_created', {
+        roomId: result.roomId,
+        playerId: socket.playerId
+      });
       
       socket.emit('room-created', {
         success: true,
@@ -99,7 +145,10 @@ io.on('connection', (socket) => {
         gameState: result.game
       });
     } else {
-      console.log(`Failed to create room: ${result.message}`);
+      logger.warn('room_create_failed', {
+        playerId: socket.playerId,
+        reason: result.message
+      });
       socket.emit('error', { message: result.message });
     }
   });
@@ -111,7 +160,11 @@ io.on('connection', (socket) => {
       return;
     }
 
-    console.log(`Player ${socket.playerName} (${socket.playerId}) attempting to join room: ${data.roomId}`);
+    logger.info('room_join_attempt', {
+      roomId: data.roomId,
+      playerName: socket.playerName,
+      playerId: socket.playerId
+    });
     
     // Check if player is currently in a different room
     const currentRoom = roomManager.getPlayerRoom(socket.playerId);
@@ -141,7 +194,11 @@ io.on('connection', (socket) => {
       socket.roomId = result.roomId;
       socket.join(result.roomId);
       
-      console.log(`Player successfully joined room: ${result.roomId}${result.reconnected ? ' (reconnected)' : ''}`);
+      logger.info('room_joined', {
+        roomId: result.roomId,
+        playerId: socket.playerId,
+        reconnected: Boolean(result.reconnected)
+      });
       
       // Notify the joining player that they have successfully joined
       socket.emit('room-joined-success', {
@@ -160,7 +217,11 @@ io.on('connection', (socket) => {
         });
       }
     } else {
-      console.log(`Failed to join room ${data.roomId}: ${result.message}`);
+      logger.warn('room_join_failed', {
+        roomId: data.roomId,
+        playerId: socket.playerId,
+        reason: result.message
+      });
       socket.emit('error', { message: result.message });
     }
   });
@@ -312,7 +373,11 @@ io.on('connection', (socket) => {
 
   // Handle disconnection
   socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
+    logger.info('socket_disconnected', {
+      socketId: socket.id,
+      playerId: socket.playerId,
+      roomId: socket.roomId
+    });
     
     // Handle socket disconnect but don't immediately remove from room
     const playerId = roomManager.handleSocketDisconnect(socket.id);
@@ -371,7 +436,10 @@ io.on('connection', (socket) => {
 setInterval(() => {
   const cleanupResult = roomManager.cleanupEmptyRooms();
   if (cleanupResult.cleanedCount > 0) {
-    console.log(`Cleaned up ${cleanupResult.cleanedCount} empty rooms`);
+    logger.info('empty_rooms_cleaned', {
+      count: cleanupResult.cleanedCount,
+      affectedPlayerCount: cleanupResult.affectedPlayers.length
+    });
 
     // Notify affected players
     cleanupResult.affectedPlayers.forEach(playerId => {
@@ -388,15 +456,43 @@ setInterval(() => {
 
 // Error handling
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  logger.error('uncaught_exception', { error: serializeError(error) });
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('unhandled_rejection', {
+    reason: serializeError(reason),
+    promise: String(promise)
+  });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Exploding Kittens server running on port ${PORT}`);
-  console.log(`Visit http://"0.0.0.0":${PORT} to play!`);
+  logger.info('server_started', {
+    port: Number(PORT),
+    host: '0.0.0.0',
+    logDirectory: logger.logDirectory
+  });
 });
+
+let shuttingDown = false;
+
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  logger.info('server_shutdown_started', { signal });
+  server.close(() => {
+    logger.info('server_stopped', { signal });
+    logger.on('finish', () => process.exit(0));
+    logger.end();
+  });
+
+  setTimeout(() => {
+    logger.error('server_shutdown_timeout', { signal });
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

@@ -1,5 +1,6 @@
 const Game = require('./gameLogic');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('./logger');
 
 class RoomManager {
   constructor(io) {
@@ -20,7 +21,11 @@ class RoomManager {
         const socket = this.io.sockets.sockets.get(socketId);
         if (socket) {
           const action = customAction ? { ...customAction, player: player.name } : null;
-          console.log(`[broadcastGameState] Broadcasting game state to playerId=${player.id}, nopeWindow=${!!game.nopeWindow}`);
+          logger.debug('game_state_broadcast', {
+            roomId,
+            playerId: player.id,
+            nopeWindowOpen: Boolean(game.nopeWindow)
+          });
           socket.emit('game-updated', {
             gameState: game.getPlayerGameState(player.id),
             action: action
@@ -67,7 +72,7 @@ class RoomManager {
   joinRoom(roomId, playerId, playerName, socketId) {
     const game = this.rooms.get(roomId);
     if (!game) {
-      console.log(`Room ${roomId} not found for player ${playerId}`);
+      logger.warn('room_not_found', { roomId, playerId });
       return { success: false, message: 'Room not found' };
     }
 
@@ -151,7 +156,10 @@ class RoomManager {
     // If room is empty, remove the room regardless of game state
     if (game.players.length === 0 && game.gameState !== 'waiting' && game.gameState !== 'finished') {
       this.rooms.delete(roomId);
-      console.log(`Room ${roomId} removed - no players remaining`);
+      logger.info('room_removed', {
+        roomId,
+        reason: 'no_players_remaining'
+      });
     } else {
       this.broadcastGameState(roomId, { type: 'player-left', message: `${game.getPlayer(playerId)?.name || 'A player'} left the game` });
     }
@@ -315,7 +323,7 @@ class RoomManager {
   }
 
   getRoomList(playerId) {
-    console.log(`Getting room list for playerId=${playerId}`);
+    logger.debug('room_list_requested', { playerId });
     const roomList = [];
     this.rooms.forEach((game, roomId) => {
       roomList.push({
