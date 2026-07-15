@@ -403,7 +403,7 @@ io.on('connection', (socket) => {
 
     // Try to rejoin the player to their previous room
     const playerRoom = roomManager.getPlayerRoom(data.playerId);
-    if (playerRoom) {
+    if (playerRoom?.roomId) {
       socket.playerId = data.playerId;
       socket.playerName = data.playerName;
       socket.roomId = playerRoom.roomId;
@@ -412,6 +412,10 @@ io.on('connection', (socket) => {
       // Update socket mapping
       roomManager.socketToPlayer.set(socket.id, data.playerId);
       roomManager.playerToSocket.set(data.playerId, socket.id);
+      roomManager.markPlayerConnected(
+        roomManager.getRoom(playerRoom.roomId),
+        data.playerId
+      );
       
       socket.emit('reconnected', {
         success: true,
@@ -432,7 +436,12 @@ io.on('connection', (socket) => {
   });
 });
 
-// Cleanup empty rooms periodically
+const configuredCleanupInterval = Number(process.env.ROOM_CLEANUP_INTERVAL_MS);
+const ROOM_CLEANUP_INTERVAL_MS = Number.isFinite(configuredCleanupInterval) && configuredCleanupInterval > 0
+  ? configuredCleanupInterval
+  : 60000;
+
+// Cleanup abandoned rooms and expired disconnected players periodically.
 setInterval(() => {
   const cleanupResult = roomManager.cleanupEmptyRooms();
   if (cleanupResult.cleanedCount > 0) {
@@ -452,7 +461,7 @@ setInterval(() => {
       }
     });
   }
-}, 300000); // Every 5 minutes
+}, ROOM_CLEANUP_INTERVAL_MS);
 
 // Error handling
 process.on('uncaughtException', (error) => {

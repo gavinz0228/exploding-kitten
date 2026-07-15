@@ -4,6 +4,9 @@ const logger = require('./logger');
 class Game {
   constructor(roomId) {
     this.roomId = roomId;
+    this.createdAt = Date.now();
+    this.lastActivityAt = this.createdAt;
+    this.emptySince = null;
     this.broadcastCallback = null;
     this.players = [];
     this.deck = new CardDeck();
@@ -40,7 +43,9 @@ class Game {
       name: playerName,
       hand: [],
       isAlive: true,
-      isReady: false
+      isReady: false,
+      connected: true,
+      disconnectedAt: null
     };
 
     this.players.push(player);
@@ -58,8 +63,14 @@ class Game {
 
     // If game is in progress, mark player as eliminated
     if (this.gameState === 'playing') {
+      const wasCurrentPlayer = playerIndex === this.currentPlayerIndex;
       player.isAlive = false;
-      this.checkGameEnd();
+      const gameEnded = this.checkGameEnd();
+
+      if (!gameEnded && wasCurrentPlayer) {
+        this.turnsRemaining = 1;
+        this.endTurn();
+      }
     } else {
       // Remove player if game hasn't started
       this.players.splice(playerIndex, 1);
@@ -1084,6 +1095,7 @@ class Game {
   }
 
   addToLog(message) {
+    this.lastActivityAt = Date.now();
     this.gameLog.push({
       timestamp: Date.now(),
       message
@@ -1109,6 +1121,7 @@ class Game {
         name: p.name,
         handSize: p.hand.length,
         isAlive: p.isAlive,
+        isConnected: p.connected,
         isCurrentPlayer: p.id === this.getCurrentPlayer()?.id
       })),
       currentPlayer: this.getCurrentPlayer()?.name,

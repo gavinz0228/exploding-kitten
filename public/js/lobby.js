@@ -284,8 +284,14 @@ class LobbyManager {
             roomInfo.appendChild(roomPlayers);
 
             const joinBtn = document.createElement('button');
-            joinBtn.className = room.canJoin ? 'secondary-btn' : 'secondary-btn';
-            joinBtn.textContent = room.canJoin ? 'Join' : 'Full';
+            joinBtn.className = 'secondary-btn';
+            joinBtn.textContent = room.isRejoin
+                ? 'Rejoin'
+                : room.canJoin
+                    ? 'Join'
+                    : room.gameState === 'playing'
+                        ? 'In Progress'
+                        : 'Full';
             joinBtn.disabled = !room.canJoin;
 
             if (room.canJoin) {

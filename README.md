@@ -210,6 +210,15 @@ Set `LOG_DIR` to change the output directory and `LOG_LEVEL` to control the
 minimum level (for example, `debug`, `info`, `warn`, or `error`). Backend logs
 are also printed to the console unless `NODE_ENV=test`.
 
+### Room Cleanup
+
+Disconnected players have five minutes to reconnect. After that grace period,
+abandoned rooms are deleted and disconnected players in otherwise active rooms
+are removed or eliminated. Cleanup runs once per minute.
+
+These timings can be changed with `ROOM_DISCONNECT_GRACE_MS`,
+`ROOM_CLEANUP_INTERVAL_MS`, and `FINISHED_ROOM_TTL_MS`.
+
 ## Contributing
 
 Feel free to submit issues and enhancement requests!
