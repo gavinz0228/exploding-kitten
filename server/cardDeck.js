@@ -145,7 +145,10 @@ class CardDeck {
     
     // Each player gets 4 cards + 1 defuse card
     for (let i = 0; i < playerCount; i++) {
-      const hand = [];
+      const defuseIndex = this.cards.findIndex(card => card.type === 'defuse');
+      const hand = defuseIndex === -1
+        ? []
+        : [this.cards.splice(defuseIndex, 1)[0]];
       
       // Draw 4 regular cards (make sure no exploding kittens in initial deal)
       let cardsDrawn = 0;
@@ -158,14 +161,6 @@ class CardDeck {
           // Put exploding kitten back in deck
           this.insertCard(card, Math.floor(Math.random() * this.cards.length));
         }
-      }
-      
-      // Add one defuse card
-      const defuseCard = this.cards.find(card => card.type === 'defuse');
-      if (defuseCard) {
-        const defuseIndex = this.cards.indexOf(defuseCard);
-        this.cards.splice(defuseIndex, 1);
-        hand.push(defuseCard);
       }
       
       hands.push(hand);

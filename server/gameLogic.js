@@ -854,7 +854,6 @@ class Game {
     }
 
     const action = this.pendingAction;
-    this.pendingAction = null;
 
     switch (action.type) {
       case 'favor':
@@ -874,6 +873,7 @@ class Game {
           return { success: false, message: 'Card not found' };
         }
         
+        this.pendingAction = null;
         const card = player.hand.splice(cardIndex, 1)[0];
         requestingPlayer.hand.push(card);
         
@@ -886,6 +886,7 @@ class Game {
           return { success: false, message: 'Not your action' };
         }
         
+        this.pendingAction = null;
         const position = response.position || 0;
         this.deck.insertCard(action.card, position);
         
@@ -894,6 +895,7 @@ class Game {
         return { success: true, message: 'Exploding Kitten placed back in deck' };
 
       default:
+        this.pendingAction = null;
         return { success: false, message: 'Unknown action type' };
     }
   }
