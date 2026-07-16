@@ -10,6 +10,7 @@ class GameManager {
         this.selectedCards = [];
         this.connectionTimeout = null;
         this.joinTimeout = null;
+        this.statusTimeout = null;
         this.init();
     }
 
@@ -1365,19 +1366,27 @@ class GameManager {
     showStatus(message, type = 'success') {
         const statusElement = document.getElementById('status-message');
         const statusText = document.getElementById('status-text');
+
+        if (this.statusTimeout) {
+            clearTimeout(this.statusTimeout);
+        }
         
         statusText.textContent = message;
         statusElement.className = `status-message ${type}`;
         statusElement.classList.remove('hidden');
 
         // Auto-hide after 4 seconds
-        setTimeout(() => {
+        this.statusTimeout = setTimeout(() => {
             this.hideStatus();
         }, 4000);
     }
 
     hideStatus() {
         document.getElementById('status-message').classList.add('hidden');
+        if (this.statusTimeout) {
+            clearTimeout(this.statusTimeout);
+            this.statusTimeout = null;
+        }
     }
 
     clearTimeouts() {

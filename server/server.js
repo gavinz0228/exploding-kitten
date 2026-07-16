@@ -215,6 +215,14 @@ io.on('connection', (socket) => {
           player: socket.playerName,
           message: `${socket.playerName} joined the game`
         });
+      } else {
+        // The browser reconnects through the normal join-room flow. Notify
+        // peers and refresh authoritative connection state for every client.
+        socket.to(result.roomId).emit('player-reconnected', {
+          playerName: socket.playerName,
+          playerId: socket.playerId
+        });
+        roomManager.broadcastGameState(result.roomId);
       }
     } else {
       logger.warn('room_join_failed', {
@@ -388,6 +396,7 @@ io.on('connection', (socket) => {
         playerName: socket.playerName,
         playerId: playerId
       });
+      roomManager.broadcastGameState(socket.roomId);
     }
   });
 
@@ -442,7 +451,7 @@ const ROOM_CLEANUP_INTERVAL_MS = Number.isFinite(configuredCleanupInterval) && c
   : 60000;
 
 // Cleanup abandoned rooms and expired disconnected players periodically.
-setInterval(() => {
+const roomCleanupInterval = setInterval(() => {
   const cleanupResult = roomManager.cleanupEmptyRooms();
   if (cleanupResult.cleanedCount > 0) {
     logger.info('empty_rooms_cleaned', {
@@ -491,16 +500,48 @@ function shutdown(signal) {
   shuttingDown = true;
 
   logger.info('server_shutdown_started', { signal });
-  server.close(() => {
-    logger.info('server_stopped', { signal });
-    logger.on('finish', () => process.exit(0));
-    logger.end();
-  });
+  clearInterval(roomCleanupInterval);
 
-  setTimeout(() => {
+  let shutdownComplete = false;
+  const finishShutdown = (exitCode) => {
+    if (shutdownComplete) return;
+    shutdownComplete = true;
+    clearTimeout(forceShutdownTimer);
+
+    logger.info('server_stopped', { signal, exitCode });
+    const loggerTimeout = setTimeout(() => process.exit(exitCode), 1000);
+    logger.once('finish', () => {
+      clearTimeout(loggerTimeout);
+      process.exit(exitCode);
+    });
+    logger.end();
+  };
+
+  const forceShutdownTimer = setTimeout(() => {
     logger.error('server_shutdown_timeout', { signal });
-    process.exit(1);
+    if (typeof server.closeAllConnections === 'function') {
+      server.closeAllConnections();
+    }
+    finishShutdown(1);
   }, 10000).unref();
+
+  // Stop WebSocket/long-poll clients first so they cannot keep the HTTP
+  // server open indefinitely. Then close any idle keep-alive connections.
+  io.disconnectSockets(true);
+  server.close((error) => {
+    if (error) {
+      logger.error('server_shutdown_failed', {
+        signal,
+        error: serializeError(error)
+      });
+      finishShutdown(1);
+      return;
+    }
+    finishShutdown(0);
+  });
+  if (typeof server.closeIdleConnections === 'function') {
+    server.closeIdleConnections();
+  }
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
