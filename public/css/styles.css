@@ -2276,6 +2276,67 @@ body.modal-open {
     overflow: hidden;
 }
 
+.activity-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin: 28px auto 0;
+    padding: 14px 20px;
+    color: #eadcbd;
+    font-size: 0.78rem;
+    background: rgba(39, 28, 24, 0.74);
+    border: 1px solid rgba(244, 231, 200, 0.2);
+    border-radius: 14px 4px 14px 4px;
+    box-shadow: 0 10px 24px rgba(22, 10, 8, 0.18);
+    backdrop-filter: blur(8px);
+}
+
+.activity-label {
+    color: var(--mustard);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.activity-metrics,
+.activity-metric {
+    display: flex;
+    align-items: center;
+}
+
+.activity-metrics {
+    gap: 14px;
+}
+
+.activity-metric {
+    gap: 6px;
+}
+
+.activity-metric strong {
+    color: var(--paper-light);
+    font: 700 1.05rem/1 var(--display-font);
+}
+
+.activity-dot {
+    width: 8px;
+    height: 8px;
+    background: #78b56c;
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgba(120, 181, 108, 0.13);
+}
+
+.activity-glyph {
+    color: var(--mustard);
+    font-size: 0.9rem;
+}
+
+.activity-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(244, 231, 200, 0.22);
+}
+
 @media (max-width: 760px) {
     .tutorial-shell {
         margin-top: 20px;
@@ -2347,5 +2408,11 @@ body.modal-open {
         top: 0;
         float: right;
         margin: 4px 4px -46px 0;
+    }
+
+    .activity-footer {
+        flex-direction: column;
+        gap: 9px;
+        text-align: center;
     }
 }

@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const RoomManager = require('./roomManager');
+const ActivityMetrics = require('./activityMetrics');
 const logger = require('./logger');
 
 const app = express();
@@ -16,6 +17,7 @@ const io = socketIo(server, {
 });
 
 const roomManager = new RoomManager(io);
+const activityMetrics = new ActivityMetrics();
 
 function serializeError(error) {
   if (!(error instanceof Error)) return error;
@@ -55,7 +57,11 @@ app.get('/api/rooms', (req, res) => {
 });
 
 app.get('/api/stats', (req, res) => {
-  res.json(roomManager.getStats());
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    ...roomManager.getStats(),
+    ...activityMetrics.getSnapshot()
+  });
 });
 
 // Routes
@@ -86,6 +92,11 @@ io.on('connection', (socket) => {
   socket.playerName = null;
   socket.playerId = null;
   socket.roomId = null;
+
+  socket.on('identify-visitor', (data = {}) => {
+    if (!activityMetrics.identify(socket.id, data.visitorId)) return;
+    io.emit('activity-metrics', activityMetrics.getSnapshot());
+  });
 
   // Handle player joining
   socket.on('join-lobby', (data) => {
@@ -397,6 +408,10 @@ io.on('connection', (socket) => {
         playerId: playerId
       });
       roomManager.broadcastGameState(socket.roomId);
+    }
+
+    if (activityMetrics.disconnect(socket.id)) {
+      io.emit('activity-metrics', activityMetrics.getSnapshot());
     }
   });
 

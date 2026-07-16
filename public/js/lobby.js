@@ -6,6 +6,7 @@ class LobbyManager {
         this.playerName = '';
         this.playerId = '';
         this.rulesTrigger = null;
+        this.visitorId = this.getVisitorId();
         this.init();
     }
 
@@ -42,7 +43,12 @@ class LobbyManager {
 
         this.socket.on('connect', () => {
             console.log('Connected to server');
+            this.socket.emit('identify-visitor', { visitorId: this.visitorId });
             this.hideLoading();
+        });
+
+        this.socket.on('activity-metrics', (metrics) => {
+            this.displayMetrics(metrics);
         });
 
         this.socket.on('disconnect', () => {
@@ -177,6 +183,9 @@ class LobbyManager {
                 this.refreshRooms();
             }
         }, 10000);
+
+        this.refreshMetrics();
+        setInterval(() => this.refreshMetrics(), 30000);
     }
 
     setPlayerName() {
@@ -318,6 +327,35 @@ class LobbyManager {
             roomItem.appendChild(joinBtn);
             roomsList.appendChild(roomItem);
         });
+    }
+
+    getVisitorId() {
+        const storedVisitorId = localStorage.getItem('visitorId');
+        if (storedVisitorId) return storedVisitorId;
+
+        const visitorId = window.crypto?.randomUUID
+            ? window.crypto.randomUUID()
+            : `visitor_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('visitorId', visitorId);
+        return visitorId;
+    }
+
+    async refreshMetrics() {
+        try {
+            const response = await fetch('/api/stats');
+            if (!response.ok) throw new Error(`Metrics request failed: ${response.status}`);
+            this.displayMetrics(await response.json());
+        } catch (error) {
+            console.error('Failed to fetch activity metrics:', error);
+        }
+    }
+
+    displayMetrics(metrics) {
+        if (!metrics) return;
+        document.getElementById('live-users').textContent =
+            Number(metrics.liveUsers || 0).toLocaleString();
+        document.getElementById('unique-users-24h').textContent =
+            Number(metrics.uniqueUsers24h || 0).toLocaleString();
     }
 
     navigateToGame(roomId) {

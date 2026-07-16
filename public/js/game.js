@@ -11,6 +11,7 @@ class GameManager {
         this.connectionTimeout = null;
         this.joinTimeout = null;
         this.statusTimeout = null;
+        this.visitorId = this.getVisitorId();
         this.init();
     }
 
@@ -40,11 +41,23 @@ class GameManager {
         document.getElementById('room-id').textContent = this.roomId;
     }
 
+    getVisitorId() {
+        const storedVisitorId = localStorage.getItem('visitorId');
+        if (storedVisitorId) return storedVisitorId;
+
+        const visitorId = window.crypto?.randomUUID
+            ? window.crypto.randomUUID()
+            : `visitor_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem('visitorId', visitorId);
+        return visitorId;
+    }
+
     setupSocketConnection() {
         this.socket = io();
 
         this.socket.on('connect', () => {
             console.log('Connected to server');
+            this.socket.emit('identify-visitor', { visitorId: this.visitorId });
             // Clear any existing timeouts
             this.clearTimeouts();
 
